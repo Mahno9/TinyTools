@@ -1,0 +1,77 @@
+# Build directories
+build/
+build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+*.cmake
+!CMakeLists.txt
+
+# Qt
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.autosave
+*.pro.user
+*.pro.user.*
+
+# Qt Creator
+*.autosave
+*.QMake.stash
+*.qmlc
+*.jsc
+.moc/
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.sln.docstates
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vscode/
+
+# Compiled binaries
+*.exe
+*.app
+*.a
+*.lib
+
+# Logs
+*.log
+logs/
+
+# OS-specific
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# IDE
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# Deployment
+windeployqt.exe
+deploy/
+
+# Test results
+Testing/
+CTestTestfile.cmake
+DartConfiguration.tcl
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
