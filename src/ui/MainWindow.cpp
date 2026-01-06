@@ -11,6 +11,7 @@
 #include <QScreen>
 #include <QGuiApplication>
 #include <QLabel>
+#include <QTimer>
 #include <QDebug>
 
 MainWindow::MainWindow(ClipboardManager* clipboardManager, QWidget* parent)
@@ -36,16 +37,16 @@ MainWindow::MainWindow(ClipboardManager* clipboardManager, QWidget* parent)
         qDebug() << "Step 3 complete: WebView setup finished";
         
         qDebug() << "Step 4: Loading saved window configuration...";
-        AppConfig config;
-        if (config.load()) {
+        AppConfig* config = AppConfig::instance();
+        if (config->load()) {
             qDebug() << "Configuration loaded successfully";
             
-            int savedWidth = config.getWindowWidth();
-            int savedHeight = config.getWindowHeight();
-            int savedX = config.getWindowX();
-            int savedY = config.getWindowY();
-            double opacity = config.getWindowOpacity() / 100.0;
-            bool alwaysOnTop = config.getAlwaysOnTop();
+            int savedWidth = config->getWindowWidth();
+            int savedHeight = config->getWindowHeight();
+            int savedX = config->getWindowX();
+            int savedY = config->getWindowY();
+            double opacity = config->getWindowOpacity() / 100.0;
+            bool alwaysOnTop = config->getAlwaysOnTop();
             
             qDebug() << "Saved size:" << savedWidth << "x" << savedHeight;
             qDebug() << "Saved position:" << savedX << "," << savedY;
@@ -91,17 +92,17 @@ MainWindow::~MainWindow() {
     qDebug() << "Destroying MainWindow";
     
     qDebug() << "Saving window position and size...";
-    AppConfig config;
-    if (config.load()) {
-        config.setWindowWidth(width());
-        config.setWindowHeight(height());
-        config.setWindowX(x());
-        config.setWindowY(y());
+    AppConfig* config = AppConfig::instance();
+    if (config->load()) {
+        config->setWindowWidth(width());
+        config->setWindowHeight(height());
+        config->setWindowX(x());
+        config->setWindowY(y());
         
         qDebug() << "Current size:" << width() << "x" << height();
         qDebug() << "Current position:" << x() << "," << y();
         
-        if (config.save()) {
+        if (config->save()) {
             qDebug() << "Window configuration saved successfully";
         } else {
             qWarning() << "Failed to save window configuration";
@@ -176,6 +177,11 @@ void MainWindow::setupWebView() {
         } else {
             qWarning() << "Cannot connect clipboard manager - m_clipboardManager is null";
         }
+        
+        // Schedule startup theme application after WebView loads
+        qDebug() << "Scheduling startup theme application...";
+        QTimer::singleShot(2000, this, &MainWindow::applyStartupTheme);
+        qDebug() << "Startup theme application scheduled (2 second delay)";
     } catch (const std::exception& e) {
         qCritical() << "Failed to initialize WebView:" << e.what();
         // Show error message
@@ -300,6 +306,22 @@ void MainWindow::toggleAlwaysOnTop() {
     qDebug() << "MainWindow::toggleAlwaysOnTop() - EXIT";
 }
 
+void MainWindow::applyWebViewTheme(bool darkTheme) {
+    qDebug() << "MainWindow::applyWebViewTheme() - ENTRY";
+    qDebug() << "Applying WebView theme:" << (darkTheme ? "dark" : "light");
+    
+    if (!m_webView) {
+        qWarning() << "Cannot apply WebView theme - m_webView is null";
+        qDebug() << "MainWindow::applyWebViewTheme() - EXIT";
+        return;
+    }
+    
+    m_webView->applyWebViewTheme(darkTheme);
+    qInfo() << "WebView theme applied:" << (darkTheme ? "dark" : "light");
+    
+    qDebug() << "MainWindow::applyWebViewTheme() - EXIT";
+}
+
 void MainWindow::setOpacity(int value) {
     qDebug() << "MainWindow::setOpacity() - ENTRY";
     qDebug() << "Opacity value:" << value << " (0-100)";
@@ -336,18 +358,18 @@ void MainWindow::onSettingsRequested() {
 void MainWindow::applySettings() {
     qDebug() << "MainWindow::applySettings() - ENTRY";
     
-    AppConfig config;
-    if (!config.load()) {
+    AppConfig* config = AppConfig::instance();
+    if (!config->load()) {
         qWarning() << "Failed to load config for applying settings";
         return;
     }
     
     // Apply window settings
-    double opacity = config.getWindowOpacity() / 100.0;
+    double opacity = config->getWindowOpacity() / 100.0;
     qDebug() << "Applying opacity:" << opacity;
     setWindowOpacity(opacity);
     
-    bool alwaysOnTop = config.getAlwaysOnTop();
+    bool alwaysOnTop = config->getAlwaysOnTop();
     Qt::WindowFlags flags = windowFlags();
     bool currentlyOnTop = (flags & Qt::WindowStaysOnTopHint);
     
@@ -371,9 +393,9 @@ void MainWindow::onClipboardChanged(const QString& text) {
     qDebug() << "Clipboard text length:" << text.length() << "characters";
     
     // Check if auto-translate is enabled
-    AppConfig config;
-    if (config.load()) {
-        bool autoTranslate = config.getAutoTranslate();
+    AppConfig* config = AppConfig::instance();
+    if (config->load()) {
+        bool autoTranslate = config->getAutoTranslate();
         qDebug() << "Auto-translate enabled:" << (autoTranslate ? "yes" : "no");
         
         if (autoTranslate && !text.isEmpty()) {
@@ -452,4 +474,30 @@ void MainWindow::changeEvent(QEvent* event) {
             hide();
         }
     }
+}
+
+void MainWindow::applyStartupTheme() {
+    qDebug() << "MainWindow::applyStartupTheme() - ENTRY";
+    
+    // Load config to get dark theme setting
+    AppConfig* config = AppConfig::instance();
+    if (!config->load()) {
+        qWarning() << "Failed to load config for startup theme - using default (light theme)";
+        qDebug() << "MainWindow::applyStartupTheme() - EXIT";
+        return;
+    }
+    
+    bool darkTheme = config->getDarkTheme();
+    qDebug() << "Startup dark theme setting:" << (darkTheme ? "dark" : "light");
+    
+    // Apply WebView theme
+    if (m_webView) {
+        qDebug() << "Applying WebView theme on startup...";
+        m_webView->applyWebViewTheme(darkTheme);
+        qInfo() << "Startup WebView theme applied:" << (darkTheme ? "dark" : "light");
+    } else {
+        qWarning() << "Cannot apply WebView theme - m_webView is null";
+    }
+    
+    qDebug() << "MainWindow::applyStartupTheme() - EXIT";
 }

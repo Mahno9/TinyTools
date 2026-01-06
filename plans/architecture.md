@@ -1920,7 +1920,7 @@ mkdir build
 cd build
 
 # Configure with CMake
-cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.5.0/msvc2019_64" ..
+cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="C:/Qt/6.3.0/msvc2019_64" ..
 
 # Build
 cmake --build . --config Release

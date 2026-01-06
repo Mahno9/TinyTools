@@ -11,6 +11,7 @@ public:
     void insertText(const QString& text);
     void reloadTranslator();
     bool isLoading() const;
+    void applyWebViewTheme(bool darkTheme);
     
 signals:
     void pageLoaded(bool success);
@@ -32,4 +33,7 @@ private:
     
     static const char* TRANSLATOR_URL;
     static const char* INPUT_SELECTOR;
+    
+    bool m_darkThemeEnabled;
+    bool m_darkThemeApplied;
 };

@@ -20,10 +20,12 @@ public:
 private slots:
     void onHotkeyPressed();
     void onNetworkStatusChanged(bool online);
+    void onSettingsChanged();
     
 private:
     void setupComponents();
     void connectSignals();
+    void applyTheme(bool darkTheme);
     
     QPointer<MainWindow> m_mainWindow;
     QPointer<TrayIcon> m_trayIcon;

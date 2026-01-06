@@ -176,6 +176,31 @@ bool HotkeyManager::unregisterHotkey() {
 #endif
 }
 
+void HotkeyManager::updateHotkey(int keyCode, Qt::KeyboardModifiers modifiers) {
+    qDebug() << "HotkeyManager::updateHotkey() - ENTRY";
+    qDebug() << "New key:" << keyCode;
+    qDebug() << "New modifiers:" << QKeySequence(keyCode | modifiers).toString();
+    
+    // Unregister existing hotkey first
+    if (m_hotkey.registered) {
+        qDebug() << "Unregistering existing hotkey...";
+        unregisterHotkey();
+        qDebug() << "Existing hotkey unregistered";
+    }
+    
+    // Register new hotkey
+    qDebug() << "Registering new hotkey...";
+    bool registered = registerHotkey(keyCode, modifiers);
+    if (registered) {
+        qDebug() << "Hotkey updated successfully";
+        qInfo() << "Updated hotkey to:" << QKeySequence(keyCode | modifiers).toString();
+    } else {
+        qWarning() << "Failed to update hotkey";
+    }
+    
+    qDebug() << "HotkeyManager::updateHotkey() - EXIT";
+}
+
 void HotkeyManager::setEnabled(bool enabled) {
     qDebug() << "HotkeyManager::setEnabled() - ENTRY";
     qDebug() << "New enabled state:" << (enabled ? "enabled" : "disabled");

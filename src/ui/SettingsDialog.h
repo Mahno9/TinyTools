@@ -4,7 +4,7 @@
 
 class QSpinBox;
 class QCheckBox;
-class QComboBox;
+class QLineEdit;
 class QPushButton;
 
 class SettingsDialog : public QDialog {
@@ -24,22 +24,21 @@ private:
     void loadSettings();
     void saveSettings();
     void applySettings();
+    int stringToKeyCode(const QString& text);
     
-    QSpinBox* m_hotkeyKeySpinBox;
-    QComboBox* m_hotkeyModifierCtrl;
-    QComboBox* m_hotkeyModifierAlt;
-    QComboBox* m_hotkeyModifierShift;
-    QComboBox* m_hotkeyModifierMeta;
+    QLineEdit* m_hotkeyKeyLineEdit;
+    QCheckBox* m_hotkeyModifierCtrl;
+    QCheckBox* m_hotkeyModifierAlt;
+    QCheckBox* m_hotkeyModifierShift;
+    QCheckBox* m_hotkeyModifierMeta;
     QCheckBox* m_alwaysOnTopCheckBox;
     QSpinBox* m_opacitySpinBox;
     QCheckBox* m_autoStartCheckBox;
     QCheckBox* m_minimizeToTrayCheckBox;
-    QComboBox* m_languageComboBox;
+    QCheckBox* m_darkThemeCheckBox;
     QPushButton* m_resetButton;
     QPushButton* m_applyButton;
     
     // Translation settings
     QCheckBox* m_autoTranslateCheckBox;
-    QComboBox* m_sourceLanguageComboBox;
-    QComboBox* m_targetLanguageComboBox;
 };

@@ -7,11 +7,12 @@
 #include <QLabel>
 #include <QSpinBox>
 #include <QCheckBox>
-#include <QComboBox>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QDialogButtonBox>
 #include <QKeySequenceEdit>
 #include <QDebug>
+#include <QValidator>
 
 SettingsDialog::SettingsDialog(QWidget* parent)
     : QDialog(parent)
@@ -32,29 +33,32 @@ void SettingsDialog::setupUI() {
     QGroupBox* hotkeyGroup = new QGroupBox("Hotkey Settings", this);
     QFormLayout* hotkeyLayout = new QFormLayout(hotkeyGroup);
     
-    m_hotkeyKeySpinBox = new QSpinBox(this);
-    m_hotkeyKeySpinBox->setRange(0, 255);
-    m_hotkeyKeySpinBox->setToolTip("Virtual key code (e.g., 84 for 'T')");
-    hotkeyLayout->addRow("Key Code:", m_hotkeyKeySpinBox);
+    m_hotkeyKeyLineEdit = new QLineEdit(this);
+    m_hotkeyKeyLineEdit->setToolTip("Enter virtual key code (e.g., 84 for 'T') or character (e.g., 'T')");
+    m_hotkeyKeyLineEdit->setInputMask("D000");
+    m_hotkeyKeyLineEdit->setMaxLength(3);
+    m_hotkeyKeyLineEdit->setPlaceholderText("84 or T");
+    hotkeyLayout->addRow("Key Code:", m_hotkeyKeyLineEdit);
     
-    m_hotkeyModifierCtrl = new QComboBox(this);
-    m_hotkeyModifierCtrl->addItem("Disabled", 0);
-    m_hotkeyModifierCtrl->addItem("Enabled", 1);
+    QLabel* keyDescriptionLabel = new QLabel("Enter virtual key code (e.g., 84 for 'T') or character (e.g., 'T', 'A', '1')", this);
+    keyDescriptionLabel->setWordWrap(true);
+    keyDescriptionLabel->setStyleSheet("color: gray; font-size: 10px;");
+    hotkeyLayout->addRow("", keyDescriptionLabel);
+    
+    m_hotkeyModifierCtrl = new QCheckBox(this);
+    m_hotkeyModifierCtrl->setToolTip("Enable Ctrl modifier");
     hotkeyLayout->addRow("Ctrl:", m_hotkeyModifierCtrl);
     
-    m_hotkeyModifierAlt = new QComboBox(this);
-    m_hotkeyModifierAlt->addItem("Disabled", 0);
-    m_hotkeyModifierAlt->addItem("Enabled", 1);
+    m_hotkeyModifierAlt = new QCheckBox(this);
+    m_hotkeyModifierAlt->setToolTip("Enable Alt modifier");
     hotkeyLayout->addRow("Alt:", m_hotkeyModifierAlt);
     
-    m_hotkeyModifierShift = new QComboBox(this);
-    m_hotkeyModifierShift->addItem("Disabled", 0);
-    m_hotkeyModifierShift->addItem("Enabled", 1);
+    m_hotkeyModifierShift = new QCheckBox(this);
+    m_hotkeyModifierShift->setToolTip("Enable Shift modifier");
     hotkeyLayout->addRow("Shift:", m_hotkeyModifierShift);
     
-    m_hotkeyModifierMeta = new QComboBox(this);
-    m_hotkeyModifierMeta->addItem("Disabled", 0);
-    m_hotkeyModifierMeta->addItem("Enabled", 1);
+    m_hotkeyModifierMeta = new QCheckBox(this);
+    m_hotkeyModifierMeta->setToolTip("Enable Win modifier");
     hotkeyLayout->addRow("Win:", m_hotkeyModifierMeta);
     
     mainLayout->addWidget(hotkeyGroup);
@@ -87,13 +91,9 @@ void SettingsDialog::setupUI() {
     m_minimizeToTrayCheckBox->setToolTip("Minimize to system tray instead of closing");
     generalLayout->addRow("Minimize to Tray:", m_minimizeToTrayCheckBox);
     
-    m_languageComboBox = new QComboBox(this);
-    m_languageComboBox->addItem("English", "en");
-    m_languageComboBox->addItem("Russian", "ru");
-    m_languageComboBox->addItem("German", "de");
-    m_languageComboBox->addItem("French", "fr");
-    m_languageComboBox->addItem("Spanish", "es");
-    generalLayout->addRow("Language:", m_languageComboBox);
+    m_darkThemeCheckBox = new QCheckBox(this);
+    m_darkThemeCheckBox->setToolTip("Enable dark theme for the application");
+    generalLayout->addRow("Dark Theme:", m_darkThemeCheckBox);
     
     mainLayout->addWidget(generalGroup);
     
@@ -104,29 +104,6 @@ void SettingsDialog::setupUI() {
     m_autoTranslateCheckBox = new QCheckBox(this);
     m_autoTranslateCheckBox->setToolTip("Automatically translate when clipboard text changes");
     translationLayout->addRow("Auto-translate on Clipboard:", m_autoTranslateCheckBox);
-    
-    m_sourceLanguageComboBox = new QComboBox(this);
-    m_sourceLanguageComboBox->addItem("Auto Detect", "auto");
-    m_sourceLanguageComboBox->addItem("English", "en");
-    m_sourceLanguageComboBox->addItem("Russian", "ru");
-    m_sourceLanguageComboBox->addItem("German", "de");
-    m_sourceLanguageComboBox->addItem("French", "fr");
-    m_sourceLanguageComboBox->addItem("Spanish", "es");
-    m_sourceLanguageComboBox->addItem("Chinese", "zh");
-    m_sourceLanguageComboBox->addItem("Japanese", "ja");
-    m_sourceLanguageComboBox->addItem("Korean", "ko");
-    translationLayout->addRow("Source Language:", m_sourceLanguageComboBox);
-    
-    m_targetLanguageComboBox = new QComboBox(this);
-    m_targetLanguageComboBox->addItem("English", "en");
-    m_targetLanguageComboBox->addItem("Russian", "ru");
-    m_targetLanguageComboBox->addItem("German", "de");
-    m_targetLanguageComboBox->addItem("French", "fr");
-    m_targetLanguageComboBox->addItem("Spanish", "es");
-    m_targetLanguageComboBox->addItem("Chinese", "zh");
-    m_targetLanguageComboBox->addItem("Japanese", "ja");
-    m_targetLanguageComboBox->addItem("Korean", "ko");
-    translationLayout->addRow("Target Language:", m_targetLanguageComboBox);
     
     mainLayout->addWidget(translationGroup);
     
@@ -161,98 +138,81 @@ void SettingsDialog::setupUI() {
 }
 
 void SettingsDialog::loadSettings() {
-    AppConfig config;
-    if (!config.load()) {
+    AppConfig* config = AppConfig::instance();
+    if (!config->load()) {
         qWarning() << "Failed to load settings";
         return;
     }
     
     // Load hotkey settings
-    m_hotkeyKeySpinBox->setValue(config.getHotkeyKey());
+    int hotkeyKey = config->getHotkeyKey();
+    m_hotkeyKeyLineEdit->setText(QString::number(hotkeyKey));
     
-    Qt::KeyboardModifiers modifiers = config.getHotkeyModifiers();
-    m_hotkeyModifierCtrl->setCurrentIndex(modifiers & Qt::ControlModifier ? 1 : 0);
-    m_hotkeyModifierAlt->setCurrentIndex(modifiers & Qt::AltModifier ? 1 : 0);
-    m_hotkeyModifierShift->setCurrentIndex(modifiers & Qt::ShiftModifier ? 1 : 0);
-    m_hotkeyModifierMeta->setCurrentIndex(modifiers & Qt::MetaModifier ? 1 : 0);
+    Qt::KeyboardModifiers modifiers = config->getHotkeyModifiers();
+    m_hotkeyModifierCtrl->setChecked(modifiers & Qt::ControlModifier);
+    m_hotkeyModifierAlt->setChecked(modifiers & Qt::AltModifier);
+    m_hotkeyModifierShift->setChecked(modifiers & Qt::ShiftModifier);
+    m_hotkeyModifierMeta->setChecked(modifiers & Qt::MetaModifier);
     
     // Load window settings
-    m_alwaysOnTopCheckBox->setChecked(config.getAlwaysOnTop());
-    m_opacitySpinBox->setValue(config.getWindowOpacity());
+    m_alwaysOnTopCheckBox->setChecked(config->getAlwaysOnTop());
+    m_opacitySpinBox->setValue(config->getWindowOpacity());
     
     // Load general settings
-    m_autoStartCheckBox->setChecked(config.getAutoStart());
-    m_minimizeToTrayCheckBox->setChecked(config.getMinimizeToTray());
-    
-    QString language = config.getLanguage();
-    int langIndex = m_languageComboBox->findData(language);
-    if (langIndex >= 0) {
-        m_languageComboBox->setCurrentIndex(langIndex);
-    }
+    m_autoStartCheckBox->setChecked(config->getAutoStart());
+    m_minimizeToTrayCheckBox->setChecked(config->getMinimizeToTray());
+    m_darkThemeCheckBox->setChecked(config->getDarkTheme());
     
     // Load translation settings
-    m_autoTranslateCheckBox->setChecked(config.getAutoTranslate());
-    
-    QString sourceLanguage = config.getSourceLanguage();
-    int sourceLangIndex = m_sourceLanguageComboBox->findData(sourceLanguage);
-    if (sourceLangIndex >= 0) {
-        m_sourceLanguageComboBox->setCurrentIndex(sourceLangIndex);
-    }
-    
-    QString targetLanguage = config.getTargetLanguage();
-    int targetLangIndex = m_targetLanguageComboBox->findData(targetLanguage);
-    if (targetLangIndex >= 0) {
-        m_targetLanguageComboBox->setCurrentIndex(targetLangIndex);
-    }
+    m_autoTranslateCheckBox->setChecked(config->getAutoTranslate());
 }
 
 void SettingsDialog::saveSettings() {
-    AppConfig config;
-    if (!config.load()) {
+    AppConfig* config = AppConfig::instance();
+    if (!config->load()) {
         qWarning() << "Failed to load config for saving";
         return;
     }
     
     // Save hotkey settings
-    int key = m_hotkeyKeySpinBox->value();
+    QString keyText = m_hotkeyKeyLineEdit->text().trimmed();
+    int key = stringToKeyCode(keyText);
+    
+    if (key == -1) {
+        qWarning() << "Invalid hotkey key code:" << keyText;
+        return;
+    }
+    
     Qt::KeyboardModifiers modifiers = Qt::NoModifier;
     
-    if (m_hotkeyModifierCtrl->currentIndex() == 1) {
+    if (m_hotkeyModifierCtrl->isChecked()) {
         modifiers |= Qt::ControlModifier;
     }
-    if (m_hotkeyModifierAlt->currentIndex() == 1) {
+    if (m_hotkeyModifierAlt->isChecked()) {
         modifiers |= Qt::AltModifier;
     }
-    if (m_hotkeyModifierShift->currentIndex() == 1) {
+    if (m_hotkeyModifierShift->isChecked()) {
         modifiers |= Qt::ShiftModifier;
     }
-    if (m_hotkeyModifierMeta->currentIndex() == 1) {
+    if (m_hotkeyModifierMeta->isChecked()) {
         modifiers |= Qt::MetaModifier;
     }
     
-    config.setHotkey(key, modifiers);
+    config->setHotkey(key, modifiers);
     
     // Save window settings
-    config.setAlwaysOnTop(m_alwaysOnTopCheckBox->isChecked());
-    config.setWindowOpacity(m_opacitySpinBox->value());
+    config->setAlwaysOnTop(m_alwaysOnTopCheckBox->isChecked());
+    config->setWindowOpacity(m_opacitySpinBox->value());
     
     // Save general settings
-    config.setAutoStart(m_autoStartCheckBox->isChecked());
-    config.setMinimizeToTray(m_minimizeToTrayCheckBox->isChecked());
-    
-    QString language = m_languageComboBox->currentData().toString();
-    config.setLanguage(language);
+    config->setAutoStart(m_autoStartCheckBox->isChecked());
+    config->setMinimizeToTray(m_minimizeToTrayCheckBox->isChecked());
+    config->setDarkTheme(m_darkThemeCheckBox->isChecked());
     
     // Save translation settings
-    config.setAutoTranslate(m_autoTranslateCheckBox->isChecked());
+    config->setAutoTranslate(m_autoTranslateCheckBox->isChecked());
     
-    QString sourceLanguage = m_sourceLanguageComboBox->currentData().toString();
-    config.setSourceLanguage(sourceLanguage);
-    
-    QString targetLanguage = m_targetLanguageComboBox->currentData().toString();
-    config.setTargetLanguage(targetLanguage);
-    
-    if (!config.save()) {
+    if (!config->save()) {
         qWarning() << "Failed to save settings";
     } else {
         qInfo() << "Settings saved successfully";
@@ -270,35 +230,21 @@ void SettingsDialog::onAccepted() {
 
 void SettingsDialog::onResetClicked() {
     // Reset all UI elements to defaults
-    m_hotkeyKeySpinBox->setValue(84); // 'T' key
-    m_hotkeyModifierCtrl->setCurrentIndex(1); // Ctrl enabled
-    m_hotkeyModifierAlt->setCurrentIndex(1); // Alt enabled
-    m_hotkeyModifierShift->setCurrentIndex(0); // Shift disabled
-    m_hotkeyModifierMeta->setCurrentIndex(0); // Win disabled
+    m_hotkeyKeyLineEdit->setText("84"); // 'T' key
+    m_hotkeyModifierCtrl->setChecked(true); // Ctrl enabled
+    m_hotkeyModifierAlt->setChecked(true); // Alt enabled
+    m_hotkeyModifierShift->setChecked(false); // Shift disabled
+    m_hotkeyModifierMeta->setChecked(false); // Win disabled
     
     m_alwaysOnTopCheckBox->setChecked(true);
     m_opacitySpinBox->setValue(90);
     
     m_autoStartCheckBox->setChecked(true);
     m_minimizeToTrayCheckBox->setChecked(true);
-    
-    int langIndex = m_languageComboBox->findData("en");
-    if (langIndex >= 0) {
-        m_languageComboBox->setCurrentIndex(langIndex);
-    }
+    m_darkThemeCheckBox->setChecked(false);
     
     // Reset translation settings
     m_autoTranslateCheckBox->setChecked(false);
-    
-    int sourceLangIndex = m_sourceLanguageComboBox->findData("auto");
-    if (sourceLangIndex >= 0) {
-        m_sourceLanguageComboBox->setCurrentIndex(sourceLangIndex);
-    }
-    
-    int targetLangIndex = m_targetLanguageComboBox->findData("en");
-    if (targetLangIndex >= 0) {
-        m_targetLanguageComboBox->setCurrentIndex(targetLangIndex);
-    }
     
     // Apply the reset settings
     applySettings();
@@ -308,4 +254,59 @@ void SettingsDialog::onOpacityChanged(int value) {
     Q_UNUSED(value);
     // Could implement live preview of opacity here
     // by temporarily setting the main window opacity
+}
+
+int SettingsDialog::stringToKeyCode(const QString& text) {
+    if (text.isEmpty()) {
+        return -1;
+    }
+    
+    // Try to parse as number
+    bool ok;
+    int keyCode = text.toInt(&ok);
+    if (ok && keyCode >= 0 && keyCode <= 255) {
+        return keyCode;
+    }
+    
+    // If not a number, try to interpret as a single character
+    if (text.length() == 1) {
+        QChar ch = text.at(0).toUpper();
+        
+        // Map characters to virtual key codes
+        // For A-Z: 65 is 'A', 90 is 'Z'
+        if (ch >= 'A' && ch <= 'Z') {
+            return ch.unicode();
+        }
+        
+        // For 0-9: 48 is '0', 57 is '9'
+        if (ch >= '0' && ch <= '9') {
+            return ch.unicode();
+        }
+        
+        // Space
+        if (ch == ' ') {
+            return 32;
+        }
+        
+        // Return key
+        if (ch == '\r' || ch == '\n') {
+            return 13;
+        }
+        
+        // Tab
+        if (ch == '\t') {
+            return 9;
+        }
+        
+        // Escape
+        if (ch == '\x1b') {
+            return 27;
+        }
+        
+        qWarning() << "Unsupported character for hotkey:" << ch;
+        return -1;
+    }
+    
+    qWarning() << "Invalid key code format:" << text;
+    return -1;
 }

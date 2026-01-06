@@ -4,6 +4,19 @@
 #include <QStandardPaths>
 #include <QDir>
 #include <QDebug>
+#include <QMutexLocker>
+
+// Static instance
+QPointer<AppConfig> AppConfig::s_instance = nullptr;
+QMutex AppConfig::s_mutex;
+
+AppConfig* AppConfig::instance() {
+    QMutexLocker locker(&s_mutex);
+    if (!s_instance) {
+        s_instance = new AppConfig();
+    }
+    return s_instance;
+}
 
 AppConfig::AppConfig() {
     m_configPath = getConfigFilePath();
@@ -55,6 +68,7 @@ bool AppConfig::save() {
     file.close();
     
     qInfo() << "Configuration saved to:" << m_configPath;
+    emit settingsChanged();
     return true;
 }
 
@@ -82,14 +96,12 @@ void AppConfig::resetToDefaults() {
     QJsonObject general;
     general["autoStart"] = true;
     general["minimizeToTray"] = true;
-    general["language"] = "en";
+    general["darkTheme"] = false;
     m_config["general"] = general;
     
     // Translation settings
     QJsonObject translation;
     translation["autoTranslate"] = false;
-    translation["sourceLanguage"] = "auto";
-    translation["targetLanguage"] = "en";
     m_config["translation"] = translation;
 }
 
@@ -208,14 +220,15 @@ void AppConfig::setMinimizeToTray(bool value) {
     m_config["general"] = general;
 }
 
-QString AppConfig::getLanguage() const {
-    return m_config["general"].toObject()["language"].toString("en");
+bool AppConfig::getDarkTheme() const {
+    return m_config["general"].toObject()["darkTheme"].toBool(false);
 }
 
-void AppConfig::setLanguage(const QString& value) {
+void AppConfig::setDarkTheme(bool value) {
     QJsonObject general = m_config["general"].toObject();
-    general["language"] = value;
+    general["darkTheme"] = value;
     m_config["general"] = general;
+    qInfo() << "Dark theme setting changed to:" << (value ? "enabled" : "disabled");
 }
 
 bool AppConfig::getAutoTranslate() const {
@@ -227,28 +240,6 @@ void AppConfig::setAutoTranslate(bool value) {
     translation["autoTranslate"] = value;
     m_config["translation"] = translation;
     qInfo() << "Auto-translate setting changed to:" << (value ? "enabled" : "disabled");
-}
-
-QString AppConfig::getSourceLanguage() const {
-    return m_config["translation"].toObject()["sourceLanguage"].toString("auto");
-}
-
-void AppConfig::setSourceLanguage(const QString& value) {
-    QJsonObject translation = m_config["translation"].toObject();
-    translation["sourceLanguage"] = value;
-    m_config["translation"] = translation;
-    qInfo() << "Source language changed to:" << value;
-}
-
-QString AppConfig::getTargetLanguage() const {
-    return m_config["translation"].toObject()["targetLanguage"].toString("en");
-}
-
-void AppConfig::setTargetLanguage(const QString& value) {
-    QJsonObject translation = m_config["translation"].toObject();
-    translation["targetLanguage"] = value;
-    m_config["translation"] = translation;
-    qInfo() << "Target language changed to:" << value;
 }
 
 QString AppConfig::getConfigFilePath() const {

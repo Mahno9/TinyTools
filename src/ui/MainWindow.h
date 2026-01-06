@@ -20,9 +20,11 @@ public:
     void insertClipboardText();
     void setOnlineStatus(bool online);
     void toggleAlwaysOnTop();
+    void applyWebViewTheme(bool darkTheme);
     
 public slots:
     void onSettingsRequested();
+    void applyStartupTheme();
     
 protected:
     void mousePressEvent(QMouseEvent* event) override;

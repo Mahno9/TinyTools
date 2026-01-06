@@ -12,6 +12,7 @@ public:
     
     bool registerHotkey(int key, Qt::KeyboardModifiers modifiers);
     bool unregisterHotkey();
+    void updateHotkey(int keyCode, Qt::KeyboardModifiers modifiers);
     void setEnabled(bool enabled);
     bool isEnabled() const { return m_enabled; }
     

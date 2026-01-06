@@ -41,7 +41,7 @@ This document provides detailed instructions for building the Yandex Translator 
    Add the following to your system environment variables:
 
    ```
-   CMAKE_PREFIX_PATH=C:\Qt\6.5.0\msvc2019_64
+   CMAKE_PREFIX_PATH=C:\Qt\6.3.0\msvc2019_64
    ```
 
 2. **Verify Qt Installation**
@@ -76,7 +76,7 @@ cd build
 
 ```bash
 cmake -G "Visual Studio 16 2019" -A x64 ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.5.0\msvc2019_64" ^
+  -DCMAKE_PREFIX_PATH="C:\Qt\6.3.0\msvc2019_64" ^
   -DCMAKE_BUILD_TYPE=Release ^
   ..
 ```
@@ -85,7 +85,7 @@ cmake -G "Visual Studio 16 2019" -A x64 ^
 
 ```bash
 cmake -G "Visual Studio 17 2022" -A x64 ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.5.0\msvc2019_64" ^
+  -DCMAKE_PREFIX_PATH="C:\Qt\6.3.0\msvc2019_64" ^
   -DCMAKE_BUILD_TYPE=Release ^
   ..
 ```
@@ -94,7 +94,7 @@ cmake -G "Visual Studio 17 2022" -A x64 ^
 
 ```bash
 cmake -G "MinGW Makefiles" ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.5.0\mingw_64" ^
+  -DCMAKE_PREFIX_PATH="C:\Qt\6.3.0\mingw_64" ^
   -DCMAKE_BUILD_TYPE=Release ^
   ..
 ```
@@ -273,7 +273,7 @@ Could not find Qt6
 
 **Solution:**
 ```bash
-set CMAKE_PREFIX_PATH=C:\Qt\6.5.0\msvc2019_64
+set CMAKE_PREFIX_PATH=C:\Qt\6.3.0\msvc2019_64
 cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
 ```
 
@@ -362,7 +362,7 @@ jobs:
     - name: Install Qt
       uses: jurplel/install-qt-action@v3
       with:
-        version: '6.5.0'
+        version: '6.3.0'
         host: 'windows'
         target: 'desktop'
         arch: 'win64_msvc2019_64'

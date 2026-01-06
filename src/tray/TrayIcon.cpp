@@ -6,6 +6,7 @@
 #include <QStyle>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QIcon>
 
 TrayIcon::TrayIcon(MainWindow* mainWindow, QObject* parent)
     : QObject(parent)
@@ -16,10 +17,10 @@ TrayIcon::TrayIcon(MainWindow* mainWindow, QObject* parent)
     qDebug() << "Creating TrayIcon with mainWindow:" << (mainWindow ? "yes" : "no");
     qDebug() << "Parent object:" << (parent ? "yes" : "no");
     
-    qDebug() << "Loading system icons...";
-    // Load icons (using style icon since actual icon files don't exist)
-    m_icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
-    m_iconActive = QApplication::style()->standardIcon(QStyle::SP_DialogYesButton);
+    qDebug() << "Loading application icons...";
+    // Load icons from resources
+    m_icon = QIcon(":/icons/icon.png");
+    m_iconActive = QIcon(":/icons/icon.png");
     qDebug() << "Icons loaded successfully";
     
     qDebug() << "Setting tray icon properties...";

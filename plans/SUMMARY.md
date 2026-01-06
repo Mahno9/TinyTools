@@ -151,7 +151,7 @@ settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
 ### Configure
 ```bash
 cmake -G "Visual Studio 16 2019" -A x64 ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.5.0\msvc2019_64" ^
+  -DCMAKE_PREFIX_PATH="C:\Qt\6.3.0\msvc2019_64" ^
   -DCMAKE_BUILD_TYPE=Release ^
   ..
 ```

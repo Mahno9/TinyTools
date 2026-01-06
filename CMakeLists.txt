@@ -30,6 +30,7 @@ set(SOURCES
     src/ui/WebViewContainer.cpp
     src/tray/TrayIcon.cpp
     src/models/AppConfig.cpp
+    src/resources/icons/resources.qrc
 )
 
 set(HEADERS

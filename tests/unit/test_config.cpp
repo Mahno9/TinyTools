@@ -21,7 +21,6 @@ void TestConfig::testDefaultValues() {
     QCOMPARE(config.getAlwaysOnTop(), true);
     QCOMPARE(config.getAutoStart(), true);
     QCOMPARE(config.getMinimizeToTray(), true);
-    QCOMPARE(config.getLanguage(), QString("en"));
 }
 
 void TestConfig::testSetAndGetValues() {
@@ -52,9 +51,6 @@ void TestConfig::testSetAndGetValues() {
     
     config.setMinimizeToTray(false);
     QCOMPARE(config.getMinimizeToTray(), false);
-    
-    config.setLanguage("ru");
-    QCOMPARE(config.getLanguage(), QString("ru"));
 }
 
 void TestConfig::testSaveAndLoad() {
@@ -63,7 +59,6 @@ void TestConfig::testSaveAndLoad() {
     // Set some values
     config1.setAlwaysOnTop(false);
     config1.setWindowOpacity(80);
-    config1.setLanguage("de");
     
     // Save to temporary location
     QVERIFY(config1.save());
@@ -75,7 +70,6 @@ void TestConfig::testSaveAndLoad() {
     // Verify values match
     QCOMPARE(config2.getAlwaysOnTop(), config1.getAlwaysOnTop());
     QCOMPARE(config2.getWindowOpacity(), config1.getWindowOpacity());
-    QCOMPARE(config2.getLanguage(), config1.getLanguage());
 }
 
 void TestConfig::cleanupTestCase() {

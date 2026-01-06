@@ -2,10 +2,15 @@
 #include <QString>
 #include <QJsonObject>
 #include <QJsonArray>
+#include <QPointer>
+#include <QObject>
+#include <QMutex>
 
-class AppConfig {
+class AppConfig : public QObject {
+    Q_OBJECT
+
 public:
-    AppConfig();
+    static AppConfig* instance();
     
     bool load();
     bool save();
@@ -42,22 +47,25 @@ public:
     bool getMinimizeToTray() const;
     void setMinimizeToTray(bool value);
     
-    QString getLanguage() const;
-    void setLanguage(const QString& value);
+    bool getDarkTheme() const;
+    void setDarkTheme(bool value);
     
     // Translation settings
     bool getAutoTranslate() const;
     void setAutoTranslate(bool value);
     
-    QString getSourceLanguage() const;
-    void setSourceLanguage(const QString& value);
-    
-    QString getTargetLanguage() const;
-    void setTargetLanguage(const QString& value);
+signals:
+    void settingsChanged();
     
 private:
+    AppConfig(); // Private constructor for singleton pattern
     QString getConfigFilePath() const;
+    
+    static QPointer<AppConfig> s_instance;
+    static QMutex s_mutex;
     
     QJsonObject m_config;
     QString m_configPath;
+    
+    Q_DISABLE_COPY(AppConfig)
 };

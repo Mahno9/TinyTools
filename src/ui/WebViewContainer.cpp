@@ -12,6 +12,8 @@ const char* WebViewContainer::INPUT_SELECTOR = "textarea[aria-label*='text']";
 
 WebViewContainer::WebViewContainer(QWidget* parent)
     : QWebEngineView(parent)
+    , m_darkThemeEnabled(false)
+    , m_darkThemeApplied(false)
 {
     // Configure page
     QWebEnginePage* page = new QWebEnginePage(this);
@@ -59,6 +61,12 @@ void WebViewContainer::onLoadFinished(bool ok) {
     if (ok) {
         qDebug() << "Page loaded successfully";
         emit pageLoaded(true);
+        
+        // Reapply dark theme if enabled
+        if (m_darkThemeEnabled) {
+            m_darkThemeApplied = false; // Reset to force reapplication
+            applyWebViewTheme(true);
+        }
     } else {
         qWarning() << "Page load failed";
         emit loadError("Failed to load translator page");
@@ -178,4 +186,168 @@ void WebViewContainer::waitForPageLoad() {
 void WebViewContainer::contextMenuEvent(QContextMenuEvent* event) {
     // Disable context menu for cleaner UI
     event->ignore();
+}
+
+void WebViewContainer::applyWebViewTheme(bool darkTheme) {
+    m_darkThemeEnabled = darkTheme;
+    
+    if (!darkTheme) {
+        // Remove dark theme by reloading the page
+        if (m_darkThemeApplied) {
+            qDebug() << "Removing dark theme";
+            reloadTranslator();
+            m_darkThemeApplied = false;
+        }
+        return;
+    }
+    
+    // Apply dark theme
+    if (m_darkThemeApplied) {
+        qDebug() << "Dark theme already applied";
+        return;
+    }
+    
+    qDebug() << "Applying dark theme to WebView";
+    
+    QString script = QString(R"(
+        (function() {
+            try {
+                // Create a unique ID for our style element
+                const styleId = 'yandex-translator-dark-theme';
+                
+                // Remove existing dark theme style if present
+                const existingStyle = document.getElementById(styleId);
+                if (existingStyle) {
+                    existingStyle.remove();
+                }
+                
+                // Create new style element
+                const style = document.createElement('style');
+                style.id = styleId;
+                style.innerHTML = `
+                    /* Background and text colors */
+                    html, body {
+                        background-color: #2b2b2b !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    /* Container elements */
+                    .container, .content, .wrapper, .translation,
+                    .source-text, .result-text, .main, .app-container,
+                    .translator-container, .page-container {
+                        background-color: #2b2b2b !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    /* Input areas */
+                    textarea, input[type="text"], input[type="search"] {
+                        background-color: #3c3f41 !important;
+                        color: #ffffff !important;
+                        border-color: #555 !important;
+                    }
+                    
+                    textarea::placeholder, input::placeholder {
+                        color: #aaaaaa !important;
+                    }
+                    
+                    /* Buttons */
+                    button, .button, [role="button"] {
+                        background-color: #5896d8 !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    button:hover, .button:hover, [role="button"]:hover {
+                        background-color: #4a7eb5 !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    /* Header and navigation */
+                    header, .header, .footer, .nav, .navigation,
+                    .sidebar, .panel {
+                        background-color: #3c3f41 !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    /* Links */
+                    a {
+                        color: #68a6e8 !important;
+                    }
+                    
+                    a:hover {
+                        color: #88b8f8 !important;
+                    }
+                    
+                    /* Cards and panels */
+                    .card, .panel, .box, .segment {
+                        background-color: #3c3f41 !important;
+                        color: #ffffff !important;
+                        border-color: #555 !important;
+                    }
+                    
+                    /* Lists and items */
+                    .list-item, .option, .suggestion {
+                        background-color: #3c3f41 !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    .list-item:hover, .option:hover, .suggestion:hover {
+                        background-color: #4a4d4f !important;
+                    }
+                    
+                    /* Dropdowns and selects */
+                    select, .select {
+                        background-color: #3c3f41 !important;
+                        color: #ffffff !important;
+                        border-color: #555 !important;
+                    }
+                    
+                    /* Icons */
+                    .icon, [class*="icon"] {
+                        color: #ffffff !important;
+                    }
+                    
+                    /* Special Yandex Translator specific elements */
+                    .input-area, .output-area, .translation-input,
+                    .translation-output, .text-area {
+                        background-color: #3c3f41 !important;
+                        color: #ffffff !important;
+                    }
+                    
+                    /* Shadows and borders */
+                    * {
+                        box-shadow: none !important;
+                    }
+                    
+                    /* Scrollbars */
+                    ::-webkit-scrollbar {
+                        width: 12px;
+                        height: 12px;
+                    }
+                    
+                    ::-webkit-scrollbar-track {
+                        background-color: #2b2b2b !important;
+                    }
+                    
+                    ::-webkit-scrollbar-thumb {
+                        background-color: #555 !important;
+                        border-radius: 6px;
+                    }
+                    
+                    ::-webkit-scrollbar-thumb:hover {
+                        background-color: #666 !important;
+                    }
+                `;
+                
+                document.head.appendChild(style);
+                console.log('Dark theme applied successfully');
+                return { success: true };
+            } catch (error) {
+                console.error('Error applying dark theme:', error);
+                return { success: false, error: error.message };
+            }
+        })();
+    )");
+    
+    injectJavaScript(script);
+    m_darkThemeApplied = true;
 }
