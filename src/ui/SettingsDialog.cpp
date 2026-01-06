@@ -97,6 +97,39 @@ void SettingsDialog::setupUI() {
     
     mainLayout->addWidget(generalGroup);
     
+    // Translation Settings Group
+    QGroupBox* translationGroup = new QGroupBox("Translation Settings", this);
+    QFormLayout* translationLayout = new QFormLayout(translationGroup);
+    
+    m_autoTranslateCheckBox = new QCheckBox(this);
+    m_autoTranslateCheckBox->setToolTip("Automatically translate when clipboard text changes");
+    translationLayout->addRow("Auto-translate on Clipboard:", m_autoTranslateCheckBox);
+    
+    m_sourceLanguageComboBox = new QComboBox(this);
+    m_sourceLanguageComboBox->addItem("Auto Detect", "auto");
+    m_sourceLanguageComboBox->addItem("English", "en");
+    m_sourceLanguageComboBox->addItem("Russian", "ru");
+    m_sourceLanguageComboBox->addItem("German", "de");
+    m_sourceLanguageComboBox->addItem("French", "fr");
+    m_sourceLanguageComboBox->addItem("Spanish", "es");
+    m_sourceLanguageComboBox->addItem("Chinese", "zh");
+    m_sourceLanguageComboBox->addItem("Japanese", "ja");
+    m_sourceLanguageComboBox->addItem("Korean", "ko");
+    translationLayout->addRow("Source Language:", m_sourceLanguageComboBox);
+    
+    m_targetLanguageComboBox = new QComboBox(this);
+    m_targetLanguageComboBox->addItem("English", "en");
+    m_targetLanguageComboBox->addItem("Russian", "ru");
+    m_targetLanguageComboBox->addItem("German", "de");
+    m_targetLanguageComboBox->addItem("French", "fr");
+    m_targetLanguageComboBox->addItem("Spanish", "es");
+    m_targetLanguageComboBox->addItem("Chinese", "zh");
+    m_targetLanguageComboBox->addItem("Japanese", "ja");
+    m_targetLanguageComboBox->addItem("Korean", "ko");
+    translationLayout->addRow("Target Language:", m_targetLanguageComboBox);
+    
+    mainLayout->addWidget(translationGroup);
+    
     // Button Box
     QHBoxLayout* buttonLayout = new QHBoxLayout();
     
@@ -156,6 +189,21 @@ void SettingsDialog::loadSettings() {
     if (langIndex >= 0) {
         m_languageComboBox->setCurrentIndex(langIndex);
     }
+    
+    // Load translation settings
+    m_autoTranslateCheckBox->setChecked(config.getAutoTranslate());
+    
+    QString sourceLanguage = config.getSourceLanguage();
+    int sourceLangIndex = m_sourceLanguageComboBox->findData(sourceLanguage);
+    if (sourceLangIndex >= 0) {
+        m_sourceLanguageComboBox->setCurrentIndex(sourceLangIndex);
+    }
+    
+    QString targetLanguage = config.getTargetLanguage();
+    int targetLangIndex = m_targetLanguageComboBox->findData(targetLanguage);
+    if (targetLangIndex >= 0) {
+        m_targetLanguageComboBox->setCurrentIndex(targetLangIndex);
+    }
 }
 
 void SettingsDialog::saveSettings() {
@@ -195,6 +243,15 @@ void SettingsDialog::saveSettings() {
     QString language = m_languageComboBox->currentData().toString();
     config.setLanguage(language);
     
+    // Save translation settings
+    config.setAutoTranslate(m_autoTranslateCheckBox->isChecked());
+    
+    QString sourceLanguage = m_sourceLanguageComboBox->currentData().toString();
+    config.setSourceLanguage(sourceLanguage);
+    
+    QString targetLanguage = m_targetLanguageComboBox->currentData().toString();
+    config.setTargetLanguage(targetLanguage);
+    
     if (!config.save()) {
         qWarning() << "Failed to save settings";
     } else {
@@ -228,6 +285,19 @@ void SettingsDialog::onResetClicked() {
     int langIndex = m_languageComboBox->findData("en");
     if (langIndex >= 0) {
         m_languageComboBox->setCurrentIndex(langIndex);
+    }
+    
+    // Reset translation settings
+    m_autoTranslateCheckBox->setChecked(false);
+    
+    int sourceLangIndex = m_sourceLanguageComboBox->findData("auto");
+    if (sourceLangIndex >= 0) {
+        m_sourceLanguageComboBox->setCurrentIndex(sourceLangIndex);
+    }
+    
+    int targetLangIndex = m_targetLanguageComboBox->findData("en");
+    if (targetLangIndex >= 0) {
+        m_targetLanguageComboBox->setCurrentIndex(targetLangIndex);
     }
     
     // Apply the reset settings

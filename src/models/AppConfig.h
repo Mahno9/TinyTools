@@ -45,6 +45,16 @@ public:
     QString getLanguage() const;
     void setLanguage(const QString& value);
     
+    // Translation settings
+    bool getAutoTranslate() const;
+    void setAutoTranslate(bool value);
+    
+    QString getSourceLanguage() const;
+    void setSourceLanguage(const QString& value);
+    
+    QString getTargetLanguage() const;
+    void setTargetLanguage(const QString& value);
+    
 private:
     QString getConfigFilePath() const;
     

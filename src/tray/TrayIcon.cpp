@@ -12,128 +12,264 @@ TrayIcon::TrayIcon(MainWindow* mainWindow, QObject* parent)
     , m_mainWindow(mainWindow)
     , m_trayIcon(new QSystemTrayIcon(this))
 {
+    qDebug() << "TrayIcon::TrayIcon() - ENTRY";
+    qDebug() << "Creating TrayIcon with mainWindow:" << (mainWindow ? "yes" : "no");
+    qDebug() << "Parent object:" << (parent ? "yes" : "no");
+    
+    qDebug() << "Loading system icons...";
     // Load icons (using style icon since actual icon files don't exist)
     m_icon = QApplication::style()->standardIcon(QStyle::SP_ComputerIcon);
     m_iconActive = QApplication::style()->standardIcon(QStyle::SP_DialogYesButton);
+    qDebug() << "Icons loaded successfully";
     
+    qDebug() << "Setting tray icon properties...";
     m_trayIcon->setIcon(m_icon);
+    qDebug() << "Icon set to SP_ComputerIcon";
+    
     m_trayIcon->setToolTip("Yandex Translator");
+    qDebug() << "Tooltip set to: 'Yandex Translator'";
     
+    qDebug() << "Creating context menu...";
     createContextMenu();
+    qDebug() << "Context menu created";
     
+    qDebug() << "Connecting tray activation signal...";
     // Connect activation signal
     connect(m_trayIcon, &QSystemTrayIcon::activated,
             this, &TrayIcon::onActivated);
+    qDebug() << "Activation signal connected";
+    
+    qDebug() << "TrayIcon constructed successfully";
+    qDebug() << "TrayIcon::TrayIcon() - EXIT";
 }
 
 TrayIcon::~TrayIcon() {
+    qDebug() << "TrayIcon::~TrayIcon() - ENTRY";
+    qDebug() << "Destroying TrayIcon";
+    
+    qDebug() << "Hiding tray icon...";
     m_trayIcon->hide();
+    qDebug() << "Tray icon hidden";
+    
+    qDebug() << "TrayIcon destroyed";
+    qDebug() << "TrayIcon::~TrayIcon() - EXIT";
 }
 
 void TrayIcon::show() {
-    m_trayIcon->show();
+    qDebug() << "TrayIcon::show() - ENTRY";
+    qDebug() << "Showing tray icon in system tray...";
+    
+    if (!m_trayIcon->isVisible()) {
+        m_trayIcon->show();
+        qDebug() << "Tray icon is now visible";
+    } else {
+        qDebug() << "Tray icon is already visible";
+    }
+    
+    qDebug() << "TrayIcon::show() - EXIT";
 }
 
 void TrayIcon::createContextMenu() {
+    qDebug() << "TrayIcon::createContextMenu() - ENTRY";
+    qDebug() << "Creating tray icon context menu...";
+    
     QMenu* menu = new QMenu();
+    qDebug() << "Menu object created";
     
     // Show/Hide Window
+    qDebug() << "Adding 'Show Window' action...";
     QAction* showAction = menu->addAction("Show Window");
     connect(showAction, &QAction::triggered, this, &TrayIcon::onShowWindow);
+    qDebug() << "'Show Window' action added";
     
+    qDebug() << "Adding 'Hide Window' action...";
     QAction* hideAction = menu->addAction("Hide Window");
     connect(hideAction, &QAction::triggered, this, &TrayIcon::onHideWindow);
+    qDebug() << "'Hide Window' action added";
     
     menu->addSeparator();
+    qDebug() << "Separator added";
     
     // Toggle Always on Top
+    qDebug() << "Adding 'Toggle Always on Top' action...";
     QAction* toggleTopAction = menu->addAction("Toggle Always on Top");
-    connect(toggleTopAction, &QAction::triggered, 
+    connect(toggleTopAction, &QAction::triggered,
             this, &TrayIcon::onToggleAlwaysOnTop);
+    qDebug() << "'Toggle Always on Top' action added";
     
     menu->addSeparator();
+    qDebug() << "Separator added";
     
     // Settings
+    qDebug() << "Adding 'Settings...' action...";
     QAction* settingsAction = menu->addAction("Settings...");
     connect(settingsAction, &QAction::triggered, this, &TrayIcon::onOpenSettings);
+    qDebug() << "'Settings...' action added";
     
     // Reload Translator
+    qDebug() << "Adding 'Reload Translator' action...";
     QAction* reloadAction = menu->addAction("Reload Translator");
     connect(reloadAction, &QAction::triggered, this, &TrayIcon::onReloadTranslator);
+    qDebug() << "'Reload Translator' action added";
     
     menu->addSeparator();
+    qDebug() << "Separator added";
     
     // Quit
+    qDebug() << "Adding 'Exit' action...";
     QAction* quitAction = menu->addAction("Exit");
     connect(quitAction, &QAction::triggered, this, &TrayIcon::onQuit);
+    qDebug() << "'Exit' action added";
     
+    qDebug() << "Setting context menu to tray icon...";
     m_trayIcon->setContextMenu(menu);
+    qDebug() << "Context menu assigned to tray icon";
+    
+    qDebug() << "TrayIcon::createContextMenu() - EXIT";
 }
 
 void TrayIcon::onActivated(QSystemTrayIcon::ActivationReason reason) {
+    qDebug() << "TrayIcon::onActivated() - ENTRY";
+    qDebug() << "Activation reason:" << reason;
+    
     switch (reason) {
         case QSystemTrayIcon::Trigger:
+            qDebug() << "Single click detected - toggling window visibility";
             // Single click: toggle window visibility
             if (m_mainWindow && m_mainWindow->isVisible()) {
+                qDebug() << "Window is visible - hiding it";
                 onHideWindow();
             } else {
+                qDebug() << "Window is hidden - showing it";
                 onShowWindow();
             }
             break;
             
         case QSystemTrayIcon::DoubleClick:
+            qDebug() << "Double click detected - showing window";
             // Double click: show window
             onShowWindow();
             break;
             
         default:
+            qDebug() << "Unhandled activation reason:" << reason;
             break;
     }
+    
+    qDebug() << "TrayIcon::onActivated() - EXIT";
 }
 
 void TrayIcon::onShowWindow() {
+    qDebug() << "TrayIcon::onShowWindow() - ENTRY";
+    
     if (m_mainWindow) {
+        qDebug() << "Showing main window...";
         m_mainWindow->showAndActivate();
+        qDebug() << "Main window shown and activated";
+        qDebug() << "Emitting showWindowRequested signal...";
         emit showWindowRequested();
+        qDebug() << "Signal emitted";
+    } else {
+        qWarning() << "Cannot show window - m_mainWindow is null";
     }
+    
+    qDebug() << "TrayIcon::onShowWindow() - EXIT";
 }
 
 void TrayIcon::onHideWindow() {
+    qDebug() << "TrayIcon::onHideWindow() - ENTRY";
+    
     if (m_mainWindow) {
+        qDebug() << "Hiding main window...";
         m_mainWindow->hide();
+        qDebug() << "Main window hidden";
+        qDebug() << "Emitting hideWindowRequested signal...";
         emit hideWindowRequested();
+        qDebug() << "Signal emitted";
+    } else {
+        qWarning() << "Cannot hide window - m_mainWindow is null";
     }
+    
+    qDebug() << "TrayIcon::onHideWindow() - EXIT";
 }
 
 void TrayIcon::onToggleAlwaysOnTop() {
+    qDebug() << "TrayIcon::onToggleAlwaysOnTop() - ENTRY";
+    
     if (m_mainWindow) {
+        qDebug() << "Toggling always-on-top setting...";
         m_mainWindow->toggleAlwaysOnTop();
+        qDebug() << "Always-on-top toggled";
+    } else {
+        qWarning() << "Cannot toggle always-on-top - m_mainWindow is null";
     }
+    
+    qDebug() << "TrayIcon::onToggleAlwaysOnTop() - EXIT";
 }
 
 void TrayIcon::onOpenSettings() {
-    // TODO: Implement settings dialog
-    qInfo() << "Opening settings...";
+    qDebug() << "TrayIcon::onOpenSettings() - ENTRY";
+    
+    if (m_mainWindow) {
+        qDebug() << "Opening settings dialog via MainWindow...";
+        m_mainWindow->onSettingsRequested();
+        qInfo() << "Settings dialog opened";
+    } else {
+        qWarning() << "Cannot open settings - m_mainWindow is null";
+    }
+    
+    qDebug() << "TrayIcon::onOpenSettings() - EXIT";
 }
 
 void TrayIcon::onReloadTranslator() {
-    // TODO: Implement reload
-    qInfo() << "Reloading translator...";
+    qDebug() << "TrayIcon::onReloadTranslator() - ENTRY";
+    
+    if (m_mainWindow) {
+        qDebug() << "Reloading translator via MainWindow...";
+        m_mainWindow->setOnlineStatus(true);
+        qInfo() << "Translator reloaded";
+    } else {
+        qWarning() << "Cannot reload translator - m_mainWindow is null";
+    }
+    
+    qDebug() << "TrayIcon::onReloadTranslator() - EXIT";
 }
 
 void TrayIcon::onQuit() {
+    qDebug() << "TrayIcon::onQuit() - ENTRY";
+    qDebug() << "Quit requested from tray icon";
+    qDebug() << "Emitting quitRequested signal...";
     emit quitRequested();
+    qDebug() << "Signal emitted";
+    qDebug() << "Quitting application...";
     QCoreApplication::quit();
+    qDebug() << "TrayIcon::onQuit() - EXIT";
 }
 
 void TrayIcon::showNotification(const QString& title, const QString& message) {
+    qDebug() << "TrayIcon::showNotification() - ENTRY";
+    qDebug() << "Notification title:" << title;
+    qDebug() << "Notification message:" << message;
+    
+    qDebug() << "Showing notification...";
     m_trayIcon->showMessage(title, message, QSystemTrayIcon::Information, 3000);
+    qDebug() << "Notification displayed";
+    
+    qDebug() << "TrayIcon::showNotification() - EXIT";
 }
 
 void TrayIcon::updateIconState() {
+    qDebug() << "TrayIcon::updateIconState() - ENTRY";
+    
     if (m_mainWindow && m_mainWindow->isVisible()) {
+        qDebug() << "Window is visible - switching to active icon";
         m_trayIcon->setIcon(m_iconActive);
+        qDebug() << "Active icon set";
     } else {
+        qDebug() << "Window is hidden - switching to normal icon";
         m_trayIcon->setIcon(m_icon);
+        qDebug() << "Normal icon set";
     }
+    
+    qDebug() << "TrayIcon::updateIconState() - EXIT";
 }

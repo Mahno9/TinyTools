@@ -21,6 +21,9 @@ public:
     void setOnlineStatus(bool online);
     void toggleAlwaysOnTop();
     
+public slots:
+    void onSettingsRequested();
+    
 protected:
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
@@ -28,13 +31,14 @@ protected:
     void changeEvent(QEvent* event) override;
     
 private slots:
-    void setOpacity(int value);
-    void onSettingsRequested();
-    
+   void setOpacity(int value);
+   void onClipboardChanged(const QString& text);
+   
 private:
     void setupUI();
     void setupWindowFlags();
     void setupWebView();
+    void applySettings();
     
     QPointer<WebViewContainer> m_webView;
     QPointer<ClipboardManager> m_clipboardManager;

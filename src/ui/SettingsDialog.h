@@ -37,4 +37,9 @@ private:
     QComboBox* m_languageComboBox;
     QPushButton* m_resetButton;
     QPushButton* m_applyButton;
+    
+    // Translation settings
+    QCheckBox* m_autoTranslateCheckBox;
+    QComboBox* m_sourceLanguageComboBox;
+    QComboBox* m_targetLanguageComboBox;
 };

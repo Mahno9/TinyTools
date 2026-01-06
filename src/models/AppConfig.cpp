@@ -84,6 +84,13 @@ void AppConfig::resetToDefaults() {
     general["minimizeToTray"] = true;
     general["language"] = "en";
     m_config["general"] = general;
+    
+    // Translation settings
+    QJsonObject translation;
+    translation["autoTranslate"] = false;
+    translation["sourceLanguage"] = "auto";
+    translation["targetLanguage"] = "en";
+    m_config["translation"] = translation;
 }
 
 int AppConfig::getHotkeyKey() const {
@@ -209,6 +216,39 @@ void AppConfig::setLanguage(const QString& value) {
     QJsonObject general = m_config["general"].toObject();
     general["language"] = value;
     m_config["general"] = general;
+}
+
+bool AppConfig::getAutoTranslate() const {
+    return m_config["translation"].toObject()["autoTranslate"].toBool(false);
+}
+
+void AppConfig::setAutoTranslate(bool value) {
+    QJsonObject translation = m_config["translation"].toObject();
+    translation["autoTranslate"] = value;
+    m_config["translation"] = translation;
+    qInfo() << "Auto-translate setting changed to:" << (value ? "enabled" : "disabled");
+}
+
+QString AppConfig::getSourceLanguage() const {
+    return m_config["translation"].toObject()["sourceLanguage"].toString("auto");
+}
+
+void AppConfig::setSourceLanguage(const QString& value) {
+    QJsonObject translation = m_config["translation"].toObject();
+    translation["sourceLanguage"] = value;
+    m_config["translation"] = translation;
+    qInfo() << "Source language changed to:" << value;
+}
+
+QString AppConfig::getTargetLanguage() const {
+    return m_config["translation"].toObject()["targetLanguage"].toString("en");
+}
+
+void AppConfig::setTargetLanguage(const QString& value) {
+    QJsonObject translation = m_config["translation"].toObject();
+    translation["targetLanguage"] = value;
+    m_config["translation"] = translation;
+    qInfo() << "Target language changed to:" << value;
 }
 
 QString AppConfig::getConfigFilePath() const {
