@@ -359,10 +359,6 @@ void MainWindow::applySettings() {
     qDebug() << "MainWindow::applySettings() - ENTRY";
     
     AppConfig* config = AppConfig::instance();
-    if (!config->load()) {
-        qWarning() << "Failed to load config for applying settings";
-        return;
-    }
     
     // Apply window settings
     double opacity = config->getWindowOpacity() / 100.0;
@@ -445,6 +441,13 @@ void MainWindow::mouseMoveEvent(QMouseEvent* event) {
         move(event->globalPos() - m_dragPosition);
         event->accept();
     }
+}
+
+void MainWindow::mouseReleaseEvent(QMouseEvent* event) {
+    if (event->button() == Qt::LeftButton) {
+        m_dragging = false;
+    }
+    QMainWindow::mouseReleaseEvent(event);
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {

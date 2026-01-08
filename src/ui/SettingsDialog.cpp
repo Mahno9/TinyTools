@@ -13,6 +13,7 @@
 #include <QKeySequenceEdit>
 #include <QDebug>
 #include <QValidator>
+#include <QMessageBox>
 
 SettingsDialog::SettingsDialog(QWidget* parent)
     : QDialog(parent)
@@ -34,8 +35,8 @@ void SettingsDialog::setupUI() {
     QFormLayout* hotkeyLayout = new QFormLayout(hotkeyGroup);
     
     m_hotkeyKeyLineEdit = new QLineEdit(this);
-    m_hotkeyKeyLineEdit->setToolTip("Enter virtual key code (e.g., 84 for 'T') or character (e.g., 'T')");
-    m_hotkeyKeyLineEdit->setInputMask("D000");
+    m_hotkeyKeyLineEdit->setToolTip("Enter virtual key code (e.g., 84 for 'T') or character (e.g., 'T', 'A', '1')");
+    // Removed restrictive input mask to allow flexible input (both numbers and single characters)
     m_hotkeyKeyLineEdit->setMaxLength(3);
     m_hotkeyKeyLineEdit->setPlaceholderText("84 or T");
     hotkeyLayout->addRow("Key Code:", m_hotkeyKeyLineEdit);
@@ -168,19 +169,17 @@ void SettingsDialog::loadSettings() {
 }
 
 void SettingsDialog::saveSettings() {
+    qDebug() << "SettingsDialog::saveSettings() - Starting save operation";
+    
     AppConfig* config = AppConfig::instance();
-    if (!config->load()) {
-        qWarning() << "Failed to load config for saving";
-        return;
-    }
     
     // Save hotkey settings
     QString keyText = m_hotkeyKeyLineEdit->text().trimmed();
     int key = stringToKeyCode(keyText);
     
     if (key == -1) {
-        qWarning() << "Invalid hotkey key code:" << keyText;
-        return;
+        qWarning() << "Invalid hotkey key code:" << keyText << "- Using default hotkey";
+        key = static_cast<int>(Qt::Key_T); // Use default 'T' key
     }
     
     Qt::KeyboardModifiers modifiers = Qt::NoModifier;
@@ -199,23 +198,41 @@ void SettingsDialog::saveSettings() {
     }
     
     config->setHotkey(key, modifiers);
+    qDebug() << "Hotkey settings configured";
     
     // Save window settings
     config->setAlwaysOnTop(m_alwaysOnTopCheckBox->isChecked());
     config->setWindowOpacity(m_opacitySpinBox->value());
+    qDebug() << "Window settings configured";
     
     // Save general settings
     config->setAutoStart(m_autoStartCheckBox->isChecked());
     config->setMinimizeToTray(m_minimizeToTrayCheckBox->isChecked());
     config->setDarkTheme(m_darkThemeCheckBox->isChecked());
+    qDebug() << "General settings configured";
     
     // Save translation settings
     config->setAutoTranslate(m_autoTranslateCheckBox->isChecked());
+    qDebug() << "Translation settings configured";
     
+    qDebug() << "Calling config->save()...";
     if (!config->save()) {
-        qWarning() << "Failed to save settings";
+        qCritical() << "Failed to save settings to disk";
+        QMessageBox::critical(
+            this,
+            "Save Failed",
+            QString("Failed to save settings to:\n%1\n\nPlease check if you have write permissions.")
+                .arg(config->getConfigFilePath())
+        );
+        qDebug() << "SettingsDialog::saveSettings() - Completed with errors";
     } else {
         qInfo() << "Settings saved successfully";
+        QMessageBox::information(
+            this,
+            "Settings Saved",
+            "All settings have been saved successfully."
+        );
+        qDebug() << "SettingsDialog::saveSettings() - Completed successfully";
     }
 }
 

@@ -318,23 +318,12 @@ void WebViewContainer::applyWebViewTheme(bool darkTheme) {
                         box-shadow: none !important;
                     }
                     
-                    /* Scrollbars */
+                    /* Hide scrollbars */
                     ::-webkit-scrollbar {
-                        width: 12px;
-                        height: 12px;
+                        display: none;
                     }
-                    
-                    ::-webkit-scrollbar-track {
-                        background-color: #2b2b2b !important;
-                    }
-                    
-                    ::-webkit-scrollbar-thumb {
-                        background-color: #555 !important;
-                        border-radius: 6px;
-                    }
-                    
-                    ::-webkit-scrollbar-thumb:hover {
-                        background-color: #666 !important;
+                    body {
+                        overflow: hidden;
                     }
                 `;
                 

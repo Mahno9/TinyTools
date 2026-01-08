@@ -47,28 +47,95 @@ bool AppConfig::load() {
 }
 
 bool AppConfig::save() {
+    qDebug() << "AppConfig::save() - Starting save operation";
+    qDebug() << "Config file path:" << m_configPath;
+    
     QJsonDocument doc(m_config);
+    qDebug() << "JSON document created from config";
     
     // Ensure directory exists
     QDir dir = QFileInfo(m_configPath).absoluteDir();
     if (!dir.exists()) {
+        qDebug() << "Config directory does not exist, creating:" << dir.path();
         if (!dir.mkpath(".")) {
-            qWarning() << "Cannot create config directory:" << dir.path();
+            qCritical() << "Failed to create config directory:" << dir.path();
+            qDebug() << "AppConfig::save() - Failed: Cannot create config directory";
             return false;
         }
+        qDebug() << "Config directory created successfully";
+    } else {
+        qDebug() << "Config directory exists:" << dir.path();
     }
     
     QFile file(m_configPath);
+    qDebug() << "Opening config file for writing:" << m_configPath;
     if (!file.open(QIODevice::WriteOnly)) {
-        qWarning() << "Cannot open config file for writing:" << m_configPath;
+        qCritical() << "Failed to open config file for writing:" << m_configPath;
+        qCritical() << "Error:" << file.errorString();
+        qDebug() << "AppConfig::save() - Failed: Cannot open file for writing";
+        return false;
+    }
+    qDebug() << "Config file opened successfully";
+    
+    QByteArray jsonData = doc.toJson();
+    qDebug() << "JSON data size:" << jsonData.size() << "bytes";
+    
+    qint64 bytesWritten = file.write(jsonData);
+    qDebug() << "Bytes written:" << bytesWritten;
+    
+    if (bytesWritten != jsonData.size()) {
+        qCritical() << "Failed to write all data. Expected:" << jsonData.size() << "Written:" << bytesWritten;
+        file.close();
+        qDebug() << "AppConfig::save() - Failed: Incomplete write";
         return false;
     }
     
-    file.write(doc.toJson());
-    file.close();
+    qDebug() << "Flushing file to disk...";
+    if (!file.flush()) {
+        qCritical() << "Failed to flush file to disk:" << m_configPath;
+        file.close();
+        qDebug() << "AppConfig::save() - Failed: Flush operation failed";
+        return false;
+    }
+    qDebug() << "File flushed successfully";
     
-    qInfo() << "Configuration saved to:" << m_configPath;
+    file.close();
+    qDebug() << "File closed";
+    
+    // Verify file was written successfully
+    qDebug() << "Verifying file was written...";
+    QFile verifyFile(m_configPath);
+    if (!verifyFile.open(QIODevice::ReadOnly)) {
+        qCritical() << "Failed to open file for verification:" << m_configPath;
+        qCritical() << "Error:" << verifyFile.errorString();
+        qDebug() << "AppConfig::save() - Failed: Cannot verify file (cannot open for reading)";
+        return false;
+    }
+    
+    QByteArray verifyData = verifyFile.readAll();
+    verifyFile.close();
+    
+    if (verifyData.isEmpty()) {
+        qCritical() << "Verification failed: File is empty:" << m_configPath;
+        qDebug() << "AppConfig::save() - Failed: File is empty after write";
+        return false;
+    }
+    
+    QJsonParseError parseError;
+    QJsonDocument verifyDoc = QJsonDocument::fromJson(verifyData, &parseError);
+    
+    if (parseError.error != QJsonParseError::NoError) {
+        qCritical() << "Verification failed: File contains invalid JSON:" << parseError.errorString();
+        qDebug() << "AppConfig::save() - Failed: Invalid JSON after write";
+        return false;
+    }
+    
+    qDebug() << "Verification successful: File contains valid JSON";
+    qDebug() << "File size after verification:" << verifyData.size() << "bytes";
+    
+    qInfo() << "Configuration saved successfully to:" << m_configPath;
     emit settingsChanged();
+    qDebug() << "AppConfig::save() - Completed successfully";
     return true;
 }
 

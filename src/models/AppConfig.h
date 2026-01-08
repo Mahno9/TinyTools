@@ -15,6 +15,7 @@ public:
     bool load();
     bool save();
     void resetToDefaults();
+    QString getConfigFilePath() const;
     
     // Hotkey settings
     int getHotkeyKey() const;
@@ -59,7 +60,6 @@ signals:
     
 private:
     AppConfig(); // Private constructor for singleton pattern
-    QString getConfigFilePath() const;
     
     static QPointer<AppConfig> s_instance;
     static QMutex s_mutex;
