@@ -5,6 +5,7 @@
 class WebViewContainer;
 class ClipboardManager;
 class QSystemTrayIcon;
+class QPushButton;
 class QMouseEvent;
 class QCloseEvent;
 class QEvent;
@@ -36,6 +37,8 @@ protected:
 private slots:
    void setOpacity(int value);
    void onClipboardChanged(const QString& text);
+   void onCloseButtonClicked();
+   void onMinimizeButtonClicked();
    
 private:
     void setupUI();
@@ -47,6 +50,8 @@ private:
     QPointer<ClipboardManager> m_clipboardManager;
     
     QWidget* m_dragHandle;
+    QPushButton* m_closeButton;
+    QPushButton* m_minimizeButton;
     QPoint m_dragPosition;
     bool m_dragging;
     

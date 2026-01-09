@@ -4,8 +4,10 @@
 #include "../models/AppConfig.h"
 #include "SettingsDialog.h"
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 #include <QMessageBox>
 #include <QSettings>
+#include <QPushButton>
 #include <QMouseEvent>
 #include <QCloseEvent>
 #include <QScreen>
@@ -132,8 +134,61 @@ void MainWindow::setupUI() {
     m_dragHandle = new QWidget(this);
     m_dragHandle->setFixedHeight(30);
     m_dragHandle->setStyleSheet("background-color: #2b2b2b;");
+    
+    // Create horizontal layout for drag handle
+    QHBoxLayout* dragHandleLayout = new QHBoxLayout(m_dragHandle);
+    dragHandleLayout->setContentsMargins(0, 0, 5, 0);
+    dragHandleLayout->setSpacing(0);
+    
+    // Add spacer to push buttons to the right
+    dragHandleLayout->addStretch();
+    
+    // Create minimize button
+    m_minimizeButton = new QPushButton("_", m_dragHandle);
+    m_minimizeButton->setFixedSize(30, 30);
+    m_minimizeButton->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #2b2b2b;"
+        "    color: #ffffff;"
+        "    border: none;"
+        "    font-size: 16px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #3b3b3b;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #4b4b4b;"
+        "}"
+    );
+    dragHandleLayout->addWidget(m_minimizeButton);
+    connect(m_minimizeButton, &QPushButton::clicked, this, &MainWindow::onMinimizeButtonClicked);
+    qDebug() << "Minimize button created";
+    
+    // Create close button
+    m_closeButton = new QPushButton("✕", m_dragHandle);
+    m_closeButton->setFixedSize(30, 30);
+    m_closeButton->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #2b2b2b;"
+        "    color: #ffffff;"
+        "    border: none;"
+        "    font-size: 14px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #ff5f5f;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #ff3f3f;"
+        "}"
+    );
+    dragHandleLayout->addWidget(m_closeButton);
+    connect(m_closeButton, &QPushButton::clicked, this, &MainWindow::onCloseButtonClicked);
+    qDebug() << "Close button created";
+    
     layout->addWidget(m_dragHandle);
-    qDebug() << "Drag handle created (30px height)";
+    qDebug() << "Drag handle created (30px height) with buttons";
     
     // Set initial size
     resize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
@@ -512,4 +567,24 @@ void MainWindow::applyStartupTheme() {
     }
     
     qDebug() << "MainWindow::applyStartupTheme() - EXIT";
+}
+
+void MainWindow::onCloseButtonClicked() {
+    qDebug() << "MainWindow::onCloseButtonClicked() - ENTRY";
+    
+    // Hide the window (same behavior as closeEvent)
+    hide();
+    qDebug() << "Window hidden (close button clicked)";
+    
+    qDebug() << "MainWindow::onCloseButtonClicked() - EXIT";
+}
+
+void MainWindow::onMinimizeButtonClicked() {
+    qDebug() << "MainWindow::onMinimizeButtonClicked() - ENTRY";
+    
+    // Minimize the window
+    showMinimized();
+    qDebug() << "Window minimized";
+    
+    qDebug() << "MainWindow::onMinimizeButtonClicked() - EXIT";
 }
