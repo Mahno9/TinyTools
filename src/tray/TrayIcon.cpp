@@ -1,5 +1,6 @@
 #include "TrayIcon.h"
 #include "../ui/MainWindow.h"
+#include "../models/AppConfig.h"
 #include <QMenu>
 #include <QAction>
 #include <QApplication>
@@ -80,7 +81,12 @@ void TrayIcon::createContextMenu() {
     // Show/Hide Window
     qDebug() << "Adding 'Show Window' action...";
     QAction* showAction = menu->addAction("Show Window");
-    connect(showAction, &QAction::triggered, this, &TrayIcon::onShowWindow);
+    connect(showAction, &QAction::triggered, this, [this]() {
+        if (m_mainWindow) {
+            qDebug() << "Show Window action triggered - showing and activating window";
+            m_mainWindow->showAndActivate();
+        }
+    });
     qDebug() << "'Show Window' action added";
     
     qDebug() << "Adding 'Hide Window' action...";
@@ -147,8 +153,8 @@ void TrayIcon::onActivated(QSystemTrayIcon::ActivationReason reason) {
             break;
             
         case QSystemTrayIcon::DoubleClick:
-            qDebug() << "Double click detected - showing window";
-            // Double click: show window
+            qDebug() << "Double click detected - showing window and inserting clipboard text";
+            // Double click: show window and insert clipboard text
             onShowWindow();
             break;
             
@@ -167,6 +173,19 @@ void TrayIcon::onShowWindow() {
         qDebug() << "Showing main window...";
         m_mainWindow->showAndActivate();
         qDebug() << "Main window shown and activated";
+        
+        // Check if auto-translate on clipboard is enabled
+        bool autoTranslate = AppConfig::instance()->getAutoTranslate();
+        qDebug() << "Auto-translate on clipboard setting:" << (autoTranslate ? "enabled" : "disabled");
+        
+        if (autoTranslate) {
+            qDebug() << "Auto-translate enabled - inserting clipboard text...";
+            m_mainWindow->insertClipboardText();
+            qDebug() << "Clipboard text inserted";
+        } else {
+            qDebug() << "Auto-translate disabled - not inserting clipboard text";
+        }
+        
         qDebug() << "Emitting showWindowRequested signal...";
         emit showWindowRequested();
         qDebug() << "Signal emitted";

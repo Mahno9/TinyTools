@@ -1,6 +1,8 @@
 #include "ClipboardManager.h"
 #include <QApplication>
 #include <QClipboard>
+#include <QPixmap>
+#include <QMimeData>
 #include <QDebug>
 
 ClipboardManager::ClipboardManager(QObject* parent)
@@ -52,8 +54,39 @@ QString ClipboardManager::getText() const {
     }
 }
 
+bool ClipboardManager::hasImage() const {
+    qDebug() << "ClipboardManager::hasImage() - ENTRY";
+    
+    if (!m_clipboard) {
+        qWarning() << "Cannot check for image - clipboard instance is null";
+        qDebug() << "ClipboardManager::hasImage() - EXIT (returning false)";
+        return false;
+    }
+    
+    const QMimeData* mimeData = m_clipboard->mimeData();
+    bool hasImage = mimeData && mimeData->hasImage();
+    qDebug() << "Clipboard has image:" << (hasImage ? "yes" : "no");
+    
+    qDebug() << "ClipboardManager::hasImage() - EXIT";
+    return hasImage;
+}
+
 bool ClipboardManager::hasText() const {
     qDebug() << "ClipboardManager::hasText() - ENTRY";
+    
+    // Check if clipboard has text but NOT images
+    if (!m_clipboard) {
+        qWarning() << "Cannot check for text - clipboard instance is null";
+        qDebug() << "ClipboardManager::hasText() - EXIT (returning false)";
+        return false;
+    }
+    
+    // Filter out images - we only want text
+    if (hasImage()) {
+        qDebug() << "Clipboard has image - not considered as text";
+        qDebug() << "ClipboardManager::hasText() - EXIT (returning false)";
+        return false;
+    }
     
     bool hasText = !getText().isEmpty();
     qDebug() << "Clipboard has text:" << (hasText ? "yes" : "no");

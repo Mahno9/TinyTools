@@ -210,13 +210,24 @@ void Application::onHotkeyPressed() {
         return;
     }
     
+    // Check if auto-translate on clipboard is enabled
+    bool autoTranslate = AppConfig::instance()->getAutoTranslate();
+    qDebug() << "Auto-translate on clipboard setting:" << (autoTranslate ? "enabled" : "disabled");
+    
     if (m_mainWindow->isVisible()) {
         qDebug() << "Hotkey pressed - window is visible, hiding window";
         m_mainWindow->hide();
     } else {
-        qDebug() << "Hotkey pressed - window is hidden, showing window and inserting clipboard text";
+        qDebug() << "Hotkey pressed - window is hidden, showing window";
         m_mainWindow->showAndActivate();
-        m_mainWindow->insertClipboardText();
+        
+        // Only insert clipboard text if auto-translate is enabled
+        if (autoTranslate) {
+            qDebug() << "Auto-translate enabled - inserting clipboard text";
+            m_mainWindow->insertClipboardText();
+        } else {
+            qDebug() << "Auto-translate disabled - not inserting clipboard text";
+        }
     }
     
     qDebug() << "Application::onHotkeyPressed() - EXIT";

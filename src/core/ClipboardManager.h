@@ -10,6 +10,7 @@ public:
     
     QString getText() const;
     bool hasText() const;
+    bool hasImage() const;
     void setText(const QString& text);
     
     static bool isValidText(const QString& text);

@@ -8,7 +8,7 @@
 #include <QDebug>
 
 const char* WebViewContainer::TRANSLATOR_URL = "https://translate.yandex.ru/";
-const char* WebViewContainer::INPUT_SELECTOR = "textarea[aria-label*='text']";
+const char* WebViewContainer::INPUT_SELECTOR = "#fakeArea";
 
 WebViewContainer::WebViewContainer(QWidget* parent)
     : QWebEngineView(parent)
@@ -111,53 +111,52 @@ void WebViewContainer::onRenderProcessTerminated(
 }
 
 void WebViewContainer::findAndInsertInInputField(const QString& text) {
-    // Escape text for JavaScript
+    // Escape text for JavaScript - need to handle both single and double quotes
     QString escapedText = text.toHtmlEscaped();
     
     QString script = QString(R"(
         (function() {
-            // Try multiple selectors to find the input field
-            const selectors = [
-                'textarea[aria-label*="text" i]',
-                'textarea[placeholder*="text" i]',
-                'textarea[data-testid*="input" i]',
-                '.input textarea',
-                '#text-input',
-                'textarea'
-            ];
-            
-            let inputElement = null;
-            
-            for (const selector of selectors) {
-                inputElement = document.querySelector(selector);
-                if (inputElement) {
-                    console.log('Found input with selector:', selector);
-                    break;
+            try {
+                // Find the contenteditable input field (#fakeArea)
+                const inputElement = document.querySelector('#fakeArea');
+                
+                if (!inputElement) {
+                    console.error('Could not find #fakeArea element');
+                    return { success: false, error: 'Input element not found' };
                 }
-            }
-            
-            if (inputElement) {
-                // Focus the input
+                
+                console.log('Found #fakeArea element');
+                
+                // Focus the element
                 inputElement.focus();
                 
-                // Set the value
-                inputElement.value = '%1';
+                // Clear existing content
+                inputElement.innerHTML = '';
+                
+                // Insert text - for contenteditable, we use innerText
+                inputElement.innerText = '%1';
                 
                 // Dispatch input event to trigger translation
-                const event = new Event('input', { bubbles: true });
-                inputElement.dispatchEvent(event);
+                const inputEvent = new InputEvent('input', {
+                    bubbles: true,
+                    cancelable: true,
+                    data: '%1'
+                });
+                inputElement.dispatchEvent(inputEvent);
                 
-                // Dispatch change event
+                // Also dispatch change event
                 const changeEvent = new Event('change', { bubbles: true });
                 inputElement.dispatchEvent(changeEvent);
                 
-                return { success: true, selector: selectors.join(', ') };
-            } else {
-                console.error('Could not find input field');
-                return { success: false, error: 'Input element not found' };
+                console.log('Text inserted successfully, length:', %2);
+                return { success: true, textLength: %2 };
+                
+            } catch (error) {
+                console.error('Error inserting text:', error);
+                return { success: false, error: error.message };
             }
         })();
-    )").arg(escapedText);
+    )").arg(escapedText).arg(text.length());
     
     injectJavaScript(script);
 }
@@ -201,7 +200,7 @@ void WebViewContainer::applyWebViewTheme(bool darkTheme) {
     QString script = QString(R"(
         (function() {
             try {
-                // Find the theme button using the selector
+                // Find theme button using selector
                 const ariaLabel = '%1';
                 const selector = `.choiceGroup-item[aria-label="${ariaLabel}"]`;
                 const button = document.querySelector(selector);
@@ -225,7 +224,7 @@ void WebViewContainer::applyWebViewTheme(bool darkTheme) {
                     return { success: false, error: 'Theme button not found' };
                 }
                 
-                // Click the button to toggle the theme
+                // Click button to toggle theme
                 button.click();
                 console.log('Theme button clicked successfully');
                 return { success: true, selector: selector };
