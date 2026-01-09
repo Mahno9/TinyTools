@@ -6,6 +6,11 @@
 #include <QDebug>
 #include <QMutexLocker>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <shlobj.h>
+#endif
+
 // Static instance
 QPointer<AppConfig> AppConfig::s_instance = nullptr;
 QMutex AppConfig::s_mutex;
@@ -161,7 +166,8 @@ void AppConfig::resetToDefaults() {
     
     // General settings
     QJsonObject general;
-    general["autoStart"] = true;
+    general["showWindowOnStartup"] = true;
+    general["autoStartOnLogin"] = false;
     general["minimizeToTray"] = true;
     general["darkTheme"] = false;
     m_config["general"] = general;
@@ -265,14 +271,75 @@ void AppConfig::setWindowHeight(int value) {
     m_config["window"] = window;
 }
 
-bool AppConfig::getAutoStart() const {
-    return m_config["general"].toObject()["autoStart"].toBool(true);
+bool AppConfig::getShowWindowOnStartup() const {
+    return m_config["general"].toObject()["showWindowOnStartup"].toBool(true);
 }
 
-void AppConfig::setAutoStart(bool value) {
+void AppConfig::setShowWindowOnStartup(bool value) {
     QJsonObject general = m_config["general"].toObject();
-    general["autoStart"] = value;
+    general["showWindowOnStartup"] = value;
     m_config["general"] = general;
+}
+
+bool AppConfig::getAutoStartOnLogin() const {
+    return m_config["general"].toObject()["autoStartOnLogin"].toBool(false);
+}
+
+void AppConfig::setAutoStartOnLogin(bool value) {
+    QJsonObject general = m_config["general"].toObject();
+    general["autoStartOnLogin"] = value;
+    m_config["general"] = general;
+    
+#ifdef _WIN32
+    // Update Windows registry autostart
+    HKEY hKey;
+    const wchar_t* regPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    const wchar_t* appName = L"YandexTranslator";
+    
+    if (value) {
+        // Add to autostart
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, regPath, 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+            // Get application path
+            wchar_t appPath[MAX_PATH];
+            GetModuleFileNameW(NULL, appPath, MAX_PATH);
+            
+            // Set registry value
+            RegSetValueExW(hKey, appName, 0, REG_SZ, (const BYTE*)appPath, (wcslen(appPath) + 1) * sizeof(wchar_t));
+            RegCloseKey(hKey);
+            qInfo() << "Added application to Windows autostart registry";
+        } else {
+            qCritical() << "Failed to open registry key for autostart";
+        }
+    } else {
+        // Remove from autostart
+        if (RegOpenKeyExW(HKEY_CURRENT_USER, regPath, 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+            RegDeleteValueW(hKey, appName);
+            RegCloseKey(hKey);
+            qInfo() << "Removed application from Windows autostart registry";
+        } else {
+            qCritical() << "Failed to open registry key for autostart removal";
+        }
+    }
+#endif
+}
+
+bool AppConfig::isAutoStartEnabledInRegistry() const {
+#ifdef _WIN32
+    HKEY hKey;
+    const wchar_t* regPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    const wchar_t* appName = L"YandexTranslator";
+    
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, regPath, 0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS) {
+        wchar_t value[MAX_PATH];
+        DWORD size = sizeof(value);
+        DWORD type;
+        
+        bool exists = (RegQueryValueExW(hKey, appName, NULL, &type, (BYTE*)value, &size) == ERROR_SUCCESS);
+        RegCloseKey(hKey);
+        return exists;
+    }
+#endif
+    return false;
 }
 
 bool AppConfig::getMinimizeToTray() const {

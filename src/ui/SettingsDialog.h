@@ -32,7 +32,8 @@ private:
     QCheckBox* m_hotkeyModifierShift;
     QCheckBox* m_alwaysOnTopCheckBox;
     QSpinBox* m_opacitySpinBox;
-    QCheckBox* m_autoStartCheckBox;
+    QCheckBox* m_showWindowOnStartupCheckBox;
+    QCheckBox* m_autoStartOnLoginCheckBox;
     QCheckBox* m_minimizeToTrayCheckBox;
     QCheckBox* m_darkThemeCheckBox;
     QPushButton* m_resetButton;

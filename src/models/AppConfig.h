@@ -42,8 +42,12 @@ public:
     void setWindowHeight(int value);
     
     // General settings
-    bool getAutoStart() const;
-    void setAutoStart(bool value);
+    bool getShowWindowOnStartup() const;
+    void setShowWindowOnStartup(bool value);
+    
+    bool getAutoStartOnLogin() const;
+    void setAutoStartOnLogin(bool value);
+    bool isAutoStartEnabledInRegistry() const;
     
     bool getMinimizeToTray() const;
     void setMinimizeToTray(bool value);

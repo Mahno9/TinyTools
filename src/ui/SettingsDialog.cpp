@@ -80,9 +80,13 @@ void SettingsDialog::setupUI() {
     QGroupBox* generalGroup = new QGroupBox("General Settings", this);
     QFormLayout* generalLayout = new QFormLayout(generalGroup);
     
-    m_autoStartCheckBox = new QCheckBox(this);
-    m_autoStartCheckBox->setToolTip("Start application automatically on Windows login");
-    generalLayout->addRow("Auto-start on Login:", m_autoStartCheckBox);
+    m_autoStartOnLoginCheckBox = new QCheckBox(this);
+    m_autoStartOnLoginCheckBox->setToolTip("Add application to Windows startup programs to launch automatically when you log in");
+    generalLayout->addRow("Auto-start on Login:", m_autoStartOnLoginCheckBox);
+    
+    m_showWindowOnStartupCheckBox = new QCheckBox(this);
+    m_showWindowOnStartupCheckBox->setToolTip("Show the application window when it starts (if disabled, runs in background)");
+    generalLayout->addRow("Show Window on Startup:", m_showWindowOnStartupCheckBox);
     
     m_minimizeToTrayCheckBox = new QCheckBox(this);
     m_minimizeToTrayCheckBox->setToolTip("Minimize to system tray instead of closing");
@@ -175,7 +179,8 @@ void SettingsDialog::loadSettings() {
     m_opacitySpinBox->setValue(config->getWindowOpacity());
     
     // Load general settings
-    m_autoStartCheckBox->setChecked(config->getAutoStart());
+    m_autoStartOnLoginCheckBox->setChecked(config->getAutoStartOnLogin());
+    m_showWindowOnStartupCheckBox->setChecked(config->getShowWindowOnStartup());
     m_minimizeToTrayCheckBox->setChecked(config->getMinimizeToTray());
     m_darkThemeCheckBox->setChecked(config->getDarkTheme());
     
@@ -234,7 +239,8 @@ void SettingsDialog::saveSettings() {
     qDebug() << "Window settings configured";
     
     // Save general settings
-    config->setAutoStart(m_autoStartCheckBox->isChecked());
+    config->setAutoStartOnLogin(m_autoStartOnLoginCheckBox->isChecked());
+    config->setShowWindowOnStartup(m_showWindowOnStartupCheckBox->isChecked());
     config->setMinimizeToTray(m_minimizeToTrayCheckBox->isChecked());
     config->setDarkTheme(m_darkThemeCheckBox->isChecked());
     qDebug() << "General settings configured";
@@ -277,7 +283,8 @@ void SettingsDialog::onResetClicked() {
     m_alwaysOnTopCheckBox->setChecked(true);
     m_opacitySpinBox->setValue(90);
     
-    m_autoStartCheckBox->setChecked(true);
+    m_autoStartOnLoginCheckBox->setChecked(false);
+    m_showWindowOnStartupCheckBox->setChecked(true);
     m_minimizeToTrayCheckBox->setChecked(true);
     m_darkThemeCheckBox->setChecked(false);
     

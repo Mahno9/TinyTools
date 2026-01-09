@@ -33,7 +33,8 @@ void Application::initialize() {
             qDebug() << "Using default configuration values";
         } else {
             qDebug() << "Configuration loaded successfully";
-            qDebug() << "Auto-start setting:" << (AppConfig::instance()->getAutoStart() ? "enabled" : "disabled");
+            qDebug() << "Show window on startup:" << (AppConfig::instance()->getShowWindowOnStartup() ? "enabled" : "disabled");
+            qDebug() << "Auto-start on login:" << (AppConfig::instance()->getAutoStartOnLogin() ? "enabled" : "disabled");
             qDebug() << "Window size:" << AppConfig::instance()->getWindowWidth() << "x" << AppConfig::instance()->getWindowHeight();
             qDebug() << "Window position:" << AppConfig::instance()->getWindowX() << "," << AppConfig::instance()->getWindowY();
             qDebug() << "Always on top:" << (AppConfig::instance()->getAlwaysOnTop() ? "yes" : "no");
@@ -51,25 +52,27 @@ void Application::initialize() {
         connectSignals();
         qDebug() << "Step 3 complete: Signals connected";
         
-        qDebug() << "Step 4: Applying auto-start settings...";
-        if (AppConfig::instance()->getAutoStart()) {
-            qDebug() << "Auto-start enabled - showing main window";
-            if (m_mainWindow) {
+        qDebug() << "Step 4: Applying startup settings...";
+        bool showWindow = AppConfig::instance()->getShowWindowOnStartup();
+        bool autoStartOnLogin = AppConfig::instance()->isAutoStartEnabledInRegistry();
+        
+        qDebug() << "Show window on startup:" << (showWindow ? "YES" : "NO");
+        qDebug() << "Auto-start on login (registry):" << (autoStartOnLogin ? "YES" : "NO");
+        
+        if (m_mainWindow) {
+            if (showWindow) {
+                qDebug() << "Showing main window";
                 m_mainWindow->show();
                 qDebug() << "Main window shown successfully";
             } else {
-                qWarning() << "Cannot show window - m_mainWindow is null";
-            }
-        } else {
-            qDebug() << "Auto-start disabled - hiding main window";
-            if (m_mainWindow) {
+                qDebug() << "Hiding main window (running in background)";
                 m_mainWindow->hide();
                 qDebug() << "Main window hidden successfully";
-            } else {
-                qWarning() << "Cannot hide window - m_mainWindow is null";
             }
+        } else {
+            qWarning() << "Cannot set window visibility - m_mainWindow is null";
         }
-        qDebug() << "Step 4 complete: Auto-start settings applied";
+        qDebug() << "Step 4 complete: Startup settings applied";
         
         qDebug() << "Application initialized successfully";
         qDebug() << "Application::initialize() - EXIT";
