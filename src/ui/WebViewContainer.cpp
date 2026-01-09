@@ -27,6 +27,7 @@ WebViewContainer::WebViewContainer(QWidget* parent)
     settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
     settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
     settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
+    settings->setAttribute(QWebEngineSettings::ShowScrollBars, false);
     
     // Connect signals
     connect(page, &QWebEnginePage::loadFinished,
@@ -35,7 +36,7 @@ WebViewContainer::WebViewContainer(QWidget* parent)
             this, &WebViewContainer::onLoadProgress);
     connect(page, &QWebEnginePage::renderProcessTerminated,
             this, &WebViewContainer::onRenderProcessTerminated);
-    
+
     // Load translator page
     load(QUrl(TRANSLATOR_URL));
 }

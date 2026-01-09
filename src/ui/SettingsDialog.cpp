@@ -227,12 +227,6 @@ void SettingsDialog::saveSettings() {
         qDebug() << "SettingsDialog::saveSettings() - Completed with errors";
     } else {
         qInfo() << "Settings saved successfully";
-        QMessageBox::information(
-            this,
-            "Settings Saved",
-            "All settings have been saved successfully."
-        );
-        qDebug() << "SettingsDialog::saveSettings() - Completed successfully";
     }
 }
 
