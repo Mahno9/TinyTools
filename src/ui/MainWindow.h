@@ -46,6 +46,7 @@ private:
     QPointer<WebViewContainer> m_webView;
     QPointer<ClipboardManager> m_clipboardManager;
     
+    QWidget* m_dragHandle;
     QPoint m_dragPosition;
     bool m_dragging;
     

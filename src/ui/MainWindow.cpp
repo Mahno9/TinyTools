@@ -128,6 +128,13 @@ void MainWindow::setupUI() {
     setCentralWidget(centralWidget);
     qDebug() << "Central widget set";
     
+    // Create drag handle (title bar) for window movement
+    m_dragHandle = new QWidget(this);
+    m_dragHandle->setFixedHeight(30);
+    m_dragHandle->setStyleSheet("background-color: #2b2b2b;");
+    layout->addWidget(m_dragHandle);
+    qDebug() << "Drag handle created (30px height)";
+    
     // Set initial size
     resize(DEFAULT_WIDTH, DEFAULT_HEIGHT);
     qDebug() << "Initial window size set to:" << DEFAULT_WIDTH << "x" << DEFAULT_HEIGHT;
@@ -423,9 +430,11 @@ void MainWindow::mousePressEvent(QMouseEvent* event) {
     qDebug() << "MainWindow::mousePressEvent() - ENTRY";
     qDebug() << "Button pressed:" << event->button();
     qDebug() << "Mouse position:" << event->globalPos();
+    qDebug() << "Local y position:" << event->pos().y();
     
-    if (event->button() == Qt::LeftButton) {
-        qDebug() << "Left button pressed - starting drag";
+    // Only allow dragging when mouse is over the drag handle (top 30px)
+    if (event->button() == Qt::LeftButton && event->pos().y() <= 30) {
+        qDebug() << "Left button pressed on drag handle - starting drag";
         m_dragging = true;
         m_dragPosition = event->globalPos() - frameGeometry().topLeft();
         qDebug() << "Drag position set to:" << m_dragPosition;
