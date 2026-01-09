@@ -48,9 +48,6 @@ namespace Constants {
     constexpr const char* ICON_TRAY_ACTIVE = ":/icons/tray-active.ico";
     constexpr const char* ICON_APP = ":/icons/app.ico";
 
-    // Style Sheet Path
-    constexpr const char* STYLE_DARK = ":/styles/dark.qss";
-
     // Configuration
     constexpr const char* CONFIG_FILE_NAME = "settings.json";
 

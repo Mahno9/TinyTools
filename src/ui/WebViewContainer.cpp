@@ -192,152 +192,51 @@ void WebViewContainer::contextMenuEvent(QContextMenuEvent* event) {
 void WebViewContainer::applyWebViewTheme(bool darkTheme) {
     m_darkThemeEnabled = darkTheme;
     
-    if (!darkTheme) {
-        // Remove dark theme by reloading the page
-        if (m_darkThemeApplied) {
-            qDebug() << "Removing dark theme";
-            reloadTranslator();
-            m_darkThemeApplied = false;
-        }
-        return;
-    }
+    // Determine which button to click based on theme preference
+    QString ariaLabel = darkTheme ? QString("Тёмная") : QString("Светлая");
+    QString themeName = darkTheme ? QString("dark") : QString("light");
     
-    // Apply dark theme
-    if (m_darkThemeApplied) {
-        qDebug() << "Dark theme already applied";
-        return;
-    }
-    
-    qDebug() << "Applying dark theme to WebView";
+    qDebug() << QString("Applying %1 theme to WebView via button click").arg(themeName);
     
     QString script = QString(R"(
         (function() {
             try {
-                // Create a unique ID for our style element
-                const styleId = 'yandex-translator-dark-theme';
+                // Find the theme button using the selector
+                const ariaLabel = '%1';
+                const selector = `.choiceGroup-item[aria-label="${ariaLabel}"]`;
+                const button = document.querySelector(selector);
                 
-                // Remove existing dark theme style if present
-                const existingStyle = document.getElementById(styleId);
-                if (existingStyle) {
-                    existingStyle.remove();
+                if (!button) {
+                    console.error('Theme button not found with selector:', selector);
+                    
+                    // Try alternative approach: look for any theme toggle button
+                    const themeButtons = document.querySelectorAll('[class*="choiceGroup-item"]');
+                    console.log('Found', themeButtons.length, 'potential theme buttons');
+                    
+                    for (let btn of themeButtons) {
+                        const label = btn.getAttribute('aria-label');
+                        if (label && label.toLowerCase().includes(ariaLabel.toLowerCase())) {
+                            console.log('Found theme button via alternative search');
+                            btn.click();
+                            return { success: true, method: 'alternative' };
+                        }
+                    }
+                    
+                    return { success: false, error: 'Theme button not found' };
                 }
                 
-                // Create new style element
-                const style = document.createElement('style');
-                style.id = styleId;
-                style.innerHTML = `
-                    /* Background and text colors */
-                    html, body {
-                        background-color: #2b2b2b !important;
-                        color: #ffffff !important;
-                    }
-                    
-                    /* Container elements */
-                    .container, .content, .wrapper, .translation,
-                    .source-text, .result-text, .main, .app-container,
-                    .translator-container, .page-container {
-                        background-color: #2b2b2b !important;
-                        color: #ffffff !important;
-                    }
-                    
-                    /* Input areas */
-                    textarea, input[type="text"], input[type="search"] {
-                        background-color: #3c3f41 !important;
-                        color: #ffffff !important;
-                        border-color: #555 !important;
-                    }
-                    
-                    textarea::placeholder, input::placeholder {
-                        color: #aaaaaa !important;
-                    }
-                    
-                    /* Buttons */
-                    button, .button, [role="button"] {
-                        background-color: #5896d8 !important;
-                        color: #ffffff !important;
-                    }
-                    
-                    button:hover, .button:hover, [role="button"]:hover {
-                        background-color: #4a7eb5 !important;
-                        color: #ffffff !important;
-                    }
-                    
-                    /* Header and navigation */
-                    header, .header, .footer, .nav, .navigation,
-                    .sidebar, .panel {
-                        background-color: #3c3f41 !important;
-                        color: #ffffff !important;
-                    }
-                    
-                    /* Links */
-                    a {
-                        color: #68a6e8 !important;
-                    }
-                    
-                    a:hover {
-                        color: #88b8f8 !important;
-                    }
-                    
-                    /* Cards and panels */
-                    .card, .panel, .box, .segment {
-                        background-color: #3c3f41 !important;
-                        color: #ffffff !important;
-                        border-color: #555 !important;
-                    }
-                    
-                    /* Lists and items */
-                    .list-item, .option, .suggestion {
-                        background-color: #3c3f41 !important;
-                        color: #ffffff !important;
-                    }
-                    
-                    .list-item:hover, .option:hover, .suggestion:hover {
-                        background-color: #4a4d4f !important;
-                    }
-                    
-                    /* Dropdowns and selects */
-                    select, .select {
-                        background-color: #3c3f41 !important;
-                        color: #ffffff !important;
-                        border-color: #555 !important;
-                    }
-                    
-                    /* Icons */
-                    .icon, [class*="icon"] {
-                        color: #ffffff !important;
-                    }
-                    
-                    /* Special Yandex Translator specific elements */
-                    .input-area, .output-area, .translation-input,
-                    .translation-output, .text-area {
-                        background-color: #3c3f41 !important;
-                        color: #ffffff !important;
-                    }
-                    
-                    /* Shadows and borders */
-                    * {
-                        box-shadow: none !important;
-                    }
-                    
-                    /* Hide scrollbars */
-                    ::-webkit-scrollbar {
-                        display: none;
-                    }
-                    body {
-                        overflow: hidden;
-                    }
-                `;
+                // Click the button to toggle the theme
+                button.click();
+                console.log('Theme button clicked successfully');
+                return { success: true, selector: selector };
                 
-                document.head.appendChild(style);
-                console.log('Dark theme applied successfully');
-                return { success: true };
             } catch (error) {
-                console.error('Error applying dark theme:', error);
+                console.error('Error applying theme:', error);
                 return { success: false, error: error.message };
             }
         })();
-    )");
+    )").arg(ariaLabel);
     
     injectJavaScript(script);
-    m_darkThemeApplied = true;
+    m_darkThemeApplied = darkTheme;
 }

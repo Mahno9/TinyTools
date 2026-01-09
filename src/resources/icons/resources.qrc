@@ -2,7 +2,4 @@
     <qresource prefix="/icons">
         <file>icon.png</file>
     </qresource>
-    <qresource prefix="/styles">
-        <file>../styles/dark.qss</file>
-    </qresource>
 </RCC>

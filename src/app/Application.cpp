@@ -7,8 +7,6 @@
 #include "../models/AppConfig.h"
 #include <QApplication>
 #include <QDebug>
-#include <QFile>
-#include <QIODevice>
 
 Application::Application(QObject* parent)
     : QObject(parent)
@@ -53,11 +51,7 @@ void Application::initialize() {
         connectSignals();
         qDebug() << "Step 3 complete: Signals connected";
         
-        qDebug() << "Step 4: Applying theme settings...";
-        applyTheme(AppConfig::instance()->getDarkTheme());
-        qDebug() << "Step 4 complete: Theme settings applied";
-        
-        qDebug() << "Step 5: Applying auto-start settings...";
+        qDebug() << "Step 4: Applying auto-start settings...";
         if (AppConfig::instance()->getAutoStart()) {
             qDebug() << "Auto-start enabled - showing main window";
             if (m_mainWindow) {
@@ -75,7 +69,7 @@ void Application::initialize() {
                 qWarning() << "Cannot hide window - m_mainWindow is null";
             }
         }
-        qDebug() << "Step 5 complete: Auto-start settings applied";
+        qDebug() << "Step 4 complete: Auto-start settings applied";
         
         qDebug() << "Application initialized successfully";
         qDebug() << "Application::initialize() - EXIT";
@@ -246,12 +240,8 @@ void Application::onSettingsChanged() {
     qDebug() << "Settings changed - updating components";
     
     try {
-        // Apply theme if dark theme setting changed
-        bool darkTheme = AppConfig::instance()->getDarkTheme();
-        qDebug() << "Applying theme setting:" << (darkTheme ? "dark" : "light");
-        applyTheme(darkTheme);
-        
         // Apply WebView theme
+        bool darkTheme = AppConfig::instance()->getDarkTheme();
         if (m_mainWindow) {
             qDebug() << "Updating WebView theme...";
             m_mainWindow->applyWebViewTheme(darkTheme);
@@ -280,37 +270,4 @@ void Application::onSettingsChanged() {
         qCritical() << "Application::onSettingsChanged() - EXCEPTION:" << e.what();
         qDebug() << "Application::onSettingsChanged() - EXIT with error";
     }
-}
-
-void Application::applyTheme(bool darkTheme) {
-    qDebug() << "Application::applyTheme() - ENTRY";
-    qDebug() << "Applying theme:" << (darkTheme ? "dark" : "light");
-    
-    if (darkTheme) {
-        QFile styleFile(":/styles/dark.qss");
-        if (!styleFile.exists()) {
-            qWarning() << "Dark theme stylesheet not found at :/styles/dark.qss";
-            qApp->setStyleSheet("");
-            qDebug() << "Application::applyTheme() - EXIT";
-            return;
-        }
-        
-        if (!styleFile.open(QIODevice::ReadOnly)) {
-            qWarning() << "Cannot open dark theme stylesheet file";
-            qApp->setStyleSheet("");
-            qDebug() << "Application::applyTheme() - EXIT";
-            return;
-        }
-        
-        QString styleSheet = QLatin1String(styleFile.readAll());
-        styleFile.close();
-        
-        qApp->setStyleSheet(styleSheet);
-        qInfo() << "Dark theme applied successfully";
-    } else {
-        qApp->setStyleSheet("");
-        qInfo() << "Light theme applied (stylesheet cleared)";
-    }
-    
-    qDebug() << "Application::applyTheme() - EXIT";
 }

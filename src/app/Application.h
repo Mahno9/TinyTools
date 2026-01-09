@@ -25,7 +25,6 @@ private slots:
 private:
     void setupComponents();
     void connectSignals();
-    void applyTheme(bool darkTheme);
     
     QPointer<MainWindow> m_mainWindow;
     QPointer<TrayIcon> m_trayIcon;
