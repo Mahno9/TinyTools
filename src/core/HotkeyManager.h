@@ -30,9 +30,14 @@ private:
         int key;
         Qt::KeyboardModifiers modifiers;
         bool registered;
+        void* windowHandle;  // Store HWND used for registration
     };
     
     HotkeyData m_hotkey;
     bool m_enabled;
     static int s_hotkeyIdCounter;
+    
+    // Helper methods for consistent window handle handling
+    void* getMainWindowHandle();
+    bool unregisterHotkeyWithHandle(void* hwnd);
 };

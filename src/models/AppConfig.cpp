@@ -200,8 +200,6 @@ void AppConfig::setHotkey(int key, Qt::KeyboardModifiers modifiers) {
         modifiersArray.append(static_cast<int>(Qt::AltModifier));
     if (modifiers & Qt::ShiftModifier)
         modifiersArray.append(static_cast<int>(Qt::ShiftModifier));
-    if (modifiers & Qt::MetaModifier)
-        modifiersArray.append(static_cast<int>(Qt::MetaModifier));
     
     hotkey["modifiers"] = modifiersArray;
     m_config["hotkey"] = hotkey;

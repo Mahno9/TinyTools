@@ -30,7 +30,6 @@ private:
     QCheckBox* m_hotkeyModifierCtrl;
     QCheckBox* m_hotkeyModifierAlt;
     QCheckBox* m_hotkeyModifierShift;
-    QCheckBox* m_hotkeyModifierMeta;
     QCheckBox* m_alwaysOnTopCheckBox;
     QSpinBox* m_opacitySpinBox;
     QCheckBox* m_autoStartCheckBox;

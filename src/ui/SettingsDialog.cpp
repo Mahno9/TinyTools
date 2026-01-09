@@ -58,10 +58,6 @@ void SettingsDialog::setupUI() {
     m_hotkeyModifierShift->setToolTip("Enable Shift modifier");
     hotkeyLayout->addRow("Shift:", m_hotkeyModifierShift);
     
-    m_hotkeyModifierMeta = new QCheckBox(this);
-    m_hotkeyModifierMeta->setToolTip("Enable Win modifier");
-    hotkeyLayout->addRow("Win:", m_hotkeyModifierMeta);
-    
     mainLayout->addWidget(hotkeyGroup);
     
     // Window Settings Group
@@ -139,21 +135,40 @@ void SettingsDialog::setupUI() {
 }
 
 void SettingsDialog::loadSettings() {
+    qDebug() << "SettingsDialog::loadSettings() - ENTRY";
+    
     AppConfig* config = AppConfig::instance();
     if (!config->load()) {
         qWarning() << "Failed to load settings";
+        qDebug() << "SettingsDialog::loadSettings() - EXIT (failed to load)";
         return;
     }
     
+    qDebug() << "Settings loaded successfully from config";
+    
     // Load hotkey settings
     int hotkeyKey = config->getHotkeyKey();
+    qDebug() << "Hotkey key from config:" << hotkeyKey;
     m_hotkeyKeyLineEdit->setText(QString::number(hotkeyKey));
     
     Qt::KeyboardModifiers modifiers = config->getHotkeyModifiers();
-    m_hotkeyModifierCtrl->setChecked(modifiers & Qt::ControlModifier);
-    m_hotkeyModifierAlt->setChecked(modifiers & Qt::AltModifier);
-    m_hotkeyModifierShift->setChecked(modifiers & Qt::ShiftModifier);
-    m_hotkeyModifierMeta->setChecked(modifiers & Qt::MetaModifier);
+    qDebug() << "=== LOADING HOTKEY MODIFIERS ===";
+    qDebug() << "Modifiers raw value from config:" << static_cast<int>(modifiers);
+    
+    bool ctrlEnabled = (modifiers & Qt::ControlModifier);
+    bool altEnabled = (modifiers & Qt::AltModifier);
+    bool shiftEnabled = (modifiers & Qt::ShiftModifier);
+    
+    qDebug() << "  Ctrl modifier from config:" << (ctrlEnabled ? "YES" : "NO");
+    qDebug() << "  Alt modifier from config:" << (altEnabled ? "YES" : "NO");
+    qDebug() << "  Shift modifier from config:" << (shiftEnabled ? "YES" : "NO");
+    
+    m_hotkeyModifierCtrl->setChecked(ctrlEnabled);
+    m_hotkeyModifierAlt->setChecked(altEnabled);
+    m_hotkeyModifierShift->setChecked(shiftEnabled);
+    
+    qDebug() << "Checkbox states set to match config";
+    qDebug() << "SettingsDialog::loadSettings() - EXIT";
     
     // Load window settings
     m_alwaysOnTopCheckBox->setChecked(config->getAlwaysOnTop());
@@ -175,28 +190,41 @@ void SettingsDialog::saveSettings() {
     
     // Save hotkey settings
     QString keyText = m_hotkeyKeyLineEdit->text().trimmed();
+    qDebug() << "Key text from UI:" << keyText;
     int key = stringToKeyCode(keyText);
     
     if (key == -1) {
         qWarning() << "Invalid hotkey key code:" << keyText << "- Using default hotkey";
         key = static_cast<int>(Qt::Key_T); // Use default 'T' key
     }
+    qDebug() << "Resolved key code:" << key;
     
     Qt::KeyboardModifiers modifiers = Qt::NoModifier;
     
-    if (m_hotkeyModifierCtrl->isChecked()) {
+    qDebug() << "=== BUILDING HOTKEY MODIFIERS FROM CHECKBOXES ===";
+    bool ctrlChecked = m_hotkeyModifierCtrl->isChecked();
+    bool altChecked = m_hotkeyModifierAlt->isChecked();
+    bool shiftChecked = m_hotkeyModifierShift->isChecked();
+    
+    qDebug() << "  Ctrl checkbox state:" << (ctrlChecked ? "CHECKED" : "UNCHECKED");
+    qDebug() << "  Alt checkbox state:" << (altChecked ? "CHECKED" : "UNCHECKED");
+    qDebug() << "  Shift checkbox state:" << (shiftChecked ? "CHECKED" : "UNCHECKED");
+    
+    if (ctrlChecked) {
         modifiers |= Qt::ControlModifier;
+        qDebug() << "  Added Qt::ControlModifier";
     }
-    if (m_hotkeyModifierAlt->isChecked()) {
+    if (altChecked) {
         modifiers |= Qt::AltModifier;
+        qDebug() << "  Added Qt::AltModifier";
     }
-    if (m_hotkeyModifierShift->isChecked()) {
+    if (shiftChecked) {
         modifiers |= Qt::ShiftModifier;
-    }
-    if (m_hotkeyModifierMeta->isChecked()) {
-        modifiers |= Qt::MetaModifier;
+        qDebug() << "  Added Qt::ShiftModifier";
     }
     
+    qDebug() << "Final modifiers value:" << static_cast<int>(modifiers);
+    qDebug() << "Calling config->setHotkey()...";
     config->setHotkey(key, modifiers);
     qDebug() << "Hotkey settings configured";
     
@@ -245,7 +273,6 @@ void SettingsDialog::onResetClicked() {
     m_hotkeyModifierCtrl->setChecked(true); // Ctrl enabled
     m_hotkeyModifierAlt->setChecked(true); // Alt enabled
     m_hotkeyModifierShift->setChecked(false); // Shift disabled
-    m_hotkeyModifierMeta->setChecked(false); // Win disabled
     
     m_alwaysOnTopCheckBox->setChecked(true);
     m_opacitySpinBox->setValue(90);
