@@ -140,7 +140,29 @@ void MainWindow::setupUI() {
     dragHandleLayout->setContentsMargins(0, 0, 5, 0);
     dragHandleLayout->setSpacing(0);
     
-    // Add spacer to push buttons to the right
+    // Create settings button (gear icon)
+    m_settingsButton = new QPushButton("⚙", m_dragHandle);
+    m_settingsButton->setFixedSize(30, 30);
+    m_settingsButton->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #2b2b2b;"
+        "    color: #ffffff;"
+        "    border: none;"
+        "    font-size: 18px;"
+        "    font-weight: bold;"
+        "}"
+        "QPushButton:hover {"
+        "    background-color: #3b3b3b;"
+        "}"
+        "QPushButton:pressed {"
+        "    background-color: #4b4b4b;"
+        "}"
+    );
+    dragHandleLayout->addWidget(m_settingsButton);
+    connect(m_settingsButton, &QPushButton::clicked, this, &MainWindow::onSettingsButtonClicked);
+    qDebug() << "Settings button created";
+    
+    // Add spacer to push control buttons to the right
     dragHandleLayout->addStretch();
     
     // Create minimize button
@@ -587,4 +609,25 @@ void MainWindow::onMinimizeButtonClicked() {
     qDebug() << "Window minimized";
     
     qDebug() << "MainWindow::onMinimizeButtonClicked() - EXIT";
+}
+
+void MainWindow::onSettingsButtonClicked() {
+    qDebug() << "MainWindow::onSettingsButtonClicked() - ENTRY";
+    qDebug() << "Opening settings dialog...";
+    
+    SettingsDialog dialog(this);
+    int result = dialog.exec();
+    
+    if (result == QDialog::Accepted) {
+        qInfo() << "Settings saved";
+        qDebug() << "Settings dialog accepted";
+        
+        // Apply settings changes
+        qDebug() << "Applying settings changes...";
+        applySettings();
+    } else {
+        qDebug() << "Settings dialog rejected/cancelled";
+    }
+    
+    qDebug() << "MainWindow::onSettingsButtonClicked() - EXIT";
 }

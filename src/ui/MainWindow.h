@@ -39,6 +39,7 @@ private slots:
    void onClipboardChanged(const QString& text);
    void onCloseButtonClicked();
    void onMinimizeButtonClicked();
+   void onSettingsButtonClicked();
    
 private:
     void setupUI();
@@ -50,6 +51,7 @@ private:
     QPointer<ClipboardManager> m_clipboardManager;
     
     QWidget* m_dragHandle;
+    QPushButton* m_settingsButton;
     QPushButton* m_closeButton;
     QPushButton* m_minimizeButton;
     QPoint m_dragPosition;
