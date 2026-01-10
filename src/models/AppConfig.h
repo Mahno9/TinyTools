@@ -22,6 +22,11 @@ public:
     Qt::KeyboardModifiers getHotkeyModifiers() const;
     void setHotkey(int key, Qt::KeyboardModifiers modifiers);
     
+    // Show and Translate hotkey settings
+    int getShowTranslateKey() const;
+    Qt::KeyboardModifiers getShowTranslateModifiers() const;
+    void setShowTranslate(int key, Qt::KeyboardModifiers modifiers);
+    
     // Window settings
     bool getAlwaysOnTop() const;
     void setAlwaysOnTop(bool value);

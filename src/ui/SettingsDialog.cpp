@@ -60,6 +60,37 @@ void SettingsDialog::setupUI() {
     
     mainLayout->addWidget(hotkeyGroup);
     
+    // Show and Translate Hotkey Group
+    QGroupBox* showTranslateGroup = new QGroupBox("Show and Translate Hotkey", this);
+    QFormLayout* showTranslateLayout = new QFormLayout(showTranslateGroup);
+    
+    showTranslateLayout->addRow(new QLabel("This hotkey opens the window and translates clipboard content.", this));
+    
+    m_showTranslateKeyLineEdit = new QLineEdit(this);
+    m_showTranslateKeyLineEdit->setToolTip("Enter virtual key code (e.g., 83 for 'S') or character (e.g., 'S', 'A', '1')");
+    m_showTranslateKeyLineEdit->setMaxLength(3);
+    m_showTranslateKeyLineEdit->setPlaceholderText("83 or S");
+    showTranslateLayout->addRow("Key Code:", m_showTranslateKeyLineEdit);
+    
+    QLabel* showTranslateKeyDescriptionLabel = new QLabel("Enter virtual key code (e.g., 83 for 'S') or character (e.g., 'S', 'A', '1')", this);
+    showTranslateKeyDescriptionLabel->setWordWrap(true);
+    showTranslateKeyDescriptionLabel->setStyleSheet("color: gray; font-size: 10px;");
+    showTranslateLayout->addRow("", showTranslateKeyDescriptionLabel);
+    
+    m_showTranslateModifierCtrl = new QCheckBox(this);
+    m_showTranslateModifierCtrl->setToolTip("Enable Ctrl modifier");
+    showTranslateLayout->addRow("Ctrl:", m_showTranslateModifierCtrl);
+    
+    m_showTranslateModifierAlt = new QCheckBox(this);
+    m_showTranslateModifierAlt->setToolTip("Enable Alt modifier");
+    showTranslateLayout->addRow("Alt:", m_showTranslateModifierAlt);
+    
+    m_showTranslateModifierShift = new QCheckBox(this);
+    m_showTranslateModifierShift->setToolTip("Enable Shift modifier");
+    showTranslateLayout->addRow("Shift:", m_showTranslateModifierShift);
+    
+    mainLayout->addWidget(showTranslateGroup);
+    
     // Window Settings Group
     QGroupBox* windowGroup = new QGroupBox("Window Settings", this);
     QFormLayout* windowLayout = new QFormLayout(windowGroup);
@@ -172,6 +203,29 @@ void SettingsDialog::loadSettings() {
     m_hotkeyModifierShift->setChecked(shiftEnabled);
     
     qDebug() << "Checkbox states set to match config";
+    
+    // Load show and translate hotkey settings
+    int showTranslateKey = config->getShowTranslateKey();
+    qDebug() << "Show and Translate hotkey key from config:" << showTranslateKey;
+    m_showTranslateKeyLineEdit->setText(QString::number(showTranslateKey));
+    
+    Qt::KeyboardModifiers showTranslateModifiers = config->getShowTranslateModifiers();
+    qDebug() << "=== LOADING SHOW AND TRANSLATE HOTKEY MODIFIERS ===";
+    qDebug() << "Modifiers raw value from config:" << static_cast<int>(showTranslateModifiers);
+    
+    bool showTranslateCtrlEnabled = (showTranslateModifiers & Qt::ControlModifier);
+    bool showTranslateAltEnabled = (showTranslateModifiers & Qt::AltModifier);
+    bool showTranslateShiftEnabled = (showTranslateModifiers & Qt::ShiftModifier);
+    
+    qDebug() << "  Show and Translate Ctrl modifier from config:" << (showTranslateCtrlEnabled ? "YES" : "NO");
+    qDebug() << "  Show and Translate Alt modifier from config:" << (showTranslateAltEnabled ? "YES" : "NO");
+    qDebug() << "  Show and Translate Shift modifier from config:" << (showTranslateShiftEnabled ? "YES" : "NO");
+    
+    m_showTranslateModifierCtrl->setChecked(showTranslateCtrlEnabled);
+    m_showTranslateModifierAlt->setChecked(showTranslateAltEnabled);
+    m_showTranslateModifierShift->setChecked(showTranslateShiftEnabled);
+    
+    qDebug() << "Show and Translate checkbox states set to match config";
     qDebug() << "SettingsDialog::loadSettings() - EXIT";
     
     // Load window settings
@@ -233,6 +287,46 @@ void SettingsDialog::saveSettings() {
     config->setHotkey(key, modifiers);
     qDebug() << "Hotkey settings configured";
     
+    // Save show and translate hotkey settings
+    QString showTranslateKeyText = m_showTranslateKeyLineEdit->text().trimmed();
+    qDebug() << "Show and Translate key text from UI:" << showTranslateKeyText;
+    int showTranslateKey = stringToKeyCode(showTranslateKeyText);
+    
+    if (showTranslateKey == -1) {
+        qWarning() << "Invalid show and translate hotkey key code:" << showTranslateKeyText << "- Using default hotkey";
+        showTranslateKey = static_cast<int>(Qt::Key_S); // Use default 'S' key
+    }
+    qDebug() << "Resolved show and translate key code:" << showTranslateKey;
+    
+    Qt::KeyboardModifiers showTranslateModifiers = Qt::NoModifier;
+    
+    qDebug() << "=== BUILDING SHOW AND TRANSLATE HOTKEY MODIFIERS FROM CHECKBOXES ===";
+    bool showTranslateCtrlChecked = m_showTranslateModifierCtrl->isChecked();
+    bool showTranslateAltChecked = m_showTranslateModifierAlt->isChecked();
+    bool showTranslateShiftChecked = m_showTranslateModifierShift->isChecked();
+    
+    qDebug() << "  Show and Translate Ctrl checkbox state:" << (showTranslateCtrlChecked ? "CHECKED" : "UNCHECKED");
+    qDebug() << "  Show and Translate Alt checkbox state:" << (showTranslateAltChecked ? "CHECKED" : "UNCHECKED");
+    qDebug() << "  Show and Translate Shift checkbox state:" << (showTranslateShiftChecked ? "CHECKED" : "UNCHECKED");
+    
+    if (showTranslateCtrlChecked) {
+        showTranslateModifiers |= Qt::ControlModifier;
+        qDebug() << "  Added Qt::ControlModifier";
+    }
+    if (showTranslateAltChecked) {
+        showTranslateModifiers |= Qt::AltModifier;
+        qDebug() << "  Added Qt::AltModifier";
+    }
+    if (showTranslateShiftChecked) {
+        showTranslateModifiers |= Qt::ShiftModifier;
+        qDebug() << "  Added Qt::ShiftModifier";
+    }
+    
+    qDebug() << "Final show and translate modifiers value:" << static_cast<int>(showTranslateModifiers);
+    qDebug() << "Calling config->setShowTranslate()...";
+    config->setShowTranslate(showTranslateKey, showTranslateModifiers);
+    qDebug() << "Show and Translate hotkey settings configured";
+    
     // Save window settings
     config->setAlwaysOnTop(m_alwaysOnTopCheckBox->isChecked());
     config->setWindowOpacity(m_opacitySpinBox->value());
@@ -290,6 +384,12 @@ void SettingsDialog::onResetClicked() {
     
     // Reset translation settings
     m_autoTranslateCheckBox->setChecked(false);
+    
+    // Reset show and translate hotkey to defaults
+    m_showTranslateKeyLineEdit->setText("83"); // 'S' key
+    m_showTranslateModifierCtrl->setChecked(true); // Ctrl enabled
+    m_showTranslateModifierAlt->setChecked(true); // Alt enabled
+    m_showTranslateModifierShift->setChecked(false); // Shift disabled
     
     // Apply the reset settings
     applySettings();

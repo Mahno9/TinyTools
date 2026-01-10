@@ -30,6 +30,13 @@ private:
     QCheckBox* m_hotkeyModifierCtrl;
     QCheckBox* m_hotkeyModifierAlt;
     QCheckBox* m_hotkeyModifierShift;
+    
+    // Show and Translate hotkey UI
+    QLineEdit* m_showTranslateKeyLineEdit;
+    QCheckBox* m_showTranslateModifierCtrl;
+    QCheckBox* m_showTranslateModifierAlt;
+    QCheckBox* m_showTranslateModifierShift;
+    
     QCheckBox* m_alwaysOnTopCheckBox;
     QSpinBox* m_opacitySpinBox;
     QCheckBox* m_showWindowOnStartupCheckBox;

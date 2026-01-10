@@ -19,6 +19,7 @@ public:
     
 private slots:
     void onHotkeyPressed();
+    void onShowTranslateHotkeyPressed();
     void onNetworkStatusChanged(bool online);
     void onSettingsChanged();
     

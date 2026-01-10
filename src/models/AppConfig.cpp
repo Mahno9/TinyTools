@@ -154,6 +154,15 @@ void AppConfig::resetToDefaults() {
     hotkey["modifiers"] = modifiers;
     m_config["hotkey"] = hotkey;
     
+    // Show and Translate hotkey: Ctrl+Alt+S
+    QJsonObject showTranslateHotkey;
+    showTranslateHotkey["key"] = static_cast<int>(Qt::Key_S);
+    QJsonArray showTranslateModifiers;
+    showTranslateModifiers.append(static_cast<int>(Qt::ControlModifier));
+    showTranslateModifiers.append(static_cast<int>(Qt::AltModifier));
+    showTranslateHotkey["modifiers"] = showTranslateModifiers;
+    m_config["showTranslateHotkey"] = showTranslateHotkey;
+    
     // Window settings
     QJsonObject window;
     window["alwaysOnTop"] = true;
@@ -209,6 +218,39 @@ void AppConfig::setHotkey(int key, Qt::KeyboardModifiers modifiers) {
     
     hotkey["modifiers"] = modifiersArray;
     m_config["hotkey"] = hotkey;
+}
+
+int AppConfig::getShowTranslateKey() const {
+    QJsonObject showTranslateHotkey = m_config["showTranslateHotkey"].toObject();
+    return showTranslateHotkey["key"].toInt();
+}
+
+Qt::KeyboardModifiers AppConfig::getShowTranslateModifiers() const {
+    QJsonObject showTranslateHotkey = m_config["showTranslateHotkey"].toObject();
+    QJsonArray modifiersArray = showTranslateHotkey["modifiers"].toArray();
+    
+    Qt::KeyboardModifiers modifiers = Qt::NoModifier;
+    for (const QJsonValue& value : modifiersArray) {
+        modifiers |= static_cast<Qt::KeyboardModifier>(value.toInt());
+    }
+    
+    return modifiers;
+}
+
+void AppConfig::setShowTranslate(int key, Qt::KeyboardModifiers modifiers) {
+    QJsonObject showTranslateHotkey;
+    showTranslateHotkey["key"] = key;
+    
+    QJsonArray modifiersArray;
+    if (modifiers & Qt::ControlModifier)
+        modifiersArray.append(static_cast<int>(Qt::ControlModifier));
+    if (modifiers & Qt::AltModifier)
+        modifiersArray.append(static_cast<int>(Qt::AltModifier));
+    if (modifiers & Qt::ShiftModifier)
+        modifiersArray.append(static_cast<int>(Qt::ShiftModifier));
+    
+    showTranslateHotkey["modifiers"] = modifiersArray;
+    m_config["showTranslateHotkey"] = showTranslateHotkey;
 }
 
 bool AppConfig::getAlwaysOnTop() const {

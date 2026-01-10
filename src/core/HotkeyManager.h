@@ -11,8 +11,10 @@ public:
     ~HotkeyManager();
     
     bool registerHotkey(int key, Qt::KeyboardModifiers modifiers);
+    bool registerShowTranslateHotkey(int key, Qt::KeyboardModifiers modifiers);
     bool unregisterHotkey();
     void updateHotkey(int keyCode, Qt::KeyboardModifiers modifiers);
+    void updateShowTranslateHotkey(int keyCode, Qt::KeyboardModifiers modifiers);
     void setEnabled(bool enabled);
     bool isEnabled() const { return m_enabled; }
     
@@ -23,6 +25,7 @@ protected:
     
 signals:
     void hotkeyPressed();
+    void showTranslateHotkeyPressed();
     
 private:
     struct HotkeyData {
@@ -34,10 +37,11 @@ private:
     };
     
     HotkeyData m_hotkey;
+    HotkeyData m_showTranslateHotkey;
     bool m_enabled;
     static int s_hotkeyIdCounter;
     
     // Helper methods for consistent window handle handling
     void* getMainWindowHandle();
-    bool unregisterHotkeyWithHandle(void* hwnd);
+    bool unregisterHotkeyWithHandle(void* hwnd, int hotkeyId);
 };

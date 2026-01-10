@@ -117,6 +117,17 @@ void Application::setupComponents() {
         qWarning() << "[Component 3/5] Failed to register hotkey";
     }
     
+    // Register show and translate hotkey from configuration
+    qDebug() << "[Component 3.5] Registering show and translate hotkey from configuration...";
+    int showTranslateKey = AppConfig::instance()->getShowTranslateKey();
+    Qt::KeyboardModifiers showTranslateModifiers = AppConfig::instance()->getShowTranslateModifiers();
+    bool showTranslateRegistered = m_hotkeyManager->registerShowTranslateHotkey(showTranslateKey, showTranslateModifiers);
+    if (showTranslateRegistered) {
+        qDebug() << "[Component 3.5] Show and translate hotkey registered successfully:" << QKeySequence(showTranslateKey | showTranslateModifiers).toString();
+    } else {
+        qWarning() << "[Component 3.5] Failed to register show and translate hotkey";
+    }
+    
     // Create main window
     qDebug() << "[Component 4/5] Creating MainWindow...";
     if (!m_clipboardManager) {
@@ -156,6 +167,16 @@ void Application::connectSignals() {
     connect(m_hotkeyManager, &HotkeyManager::hotkeyPressed,
             this, &Application::onHotkeyPressed);
     qDebug() << "Hotkey signal connected successfully";
+    
+    // Show and Translate hotkey activation
+    qDebug() << "Connecting HotkeyManager::showTranslateHotkeyPressed to Application::onShowTranslateHotkeyPressed...";
+    if (!m_hotkeyManager) {
+        qCritical() << "ERROR: Cannot connect show translate hotkey signal - m_hotkeyManager is null";
+        throw std::runtime_error("HotkeyManager is null");
+    }
+    connect(m_hotkeyManager, &HotkeyManager::showTranslateHotkeyPressed,
+            this, &Application::onShowTranslateHotkeyPressed);
+    qDebug() << "Show and Translate hotkey signal connected successfully";
     
     // Network status changes
     qDebug() << "Connecting NetworkMonitor::onlineStatusChanged to Application::onNetworkStatusChanged...";
@@ -233,6 +254,23 @@ void Application::onHotkeyPressed() {
     qDebug() << "Application::onHotkeyPressed() - EXIT";
 }
 
+void Application::onShowTranslateHotkeyPressed() {
+    qDebug() << "Application::onShowTranslateHotkeyPressed() - ENTRY";
+    
+    if (!m_mainWindow) {
+        qWarning() << "Show and Translate hotkey pressed but m_mainWindow is null - ignoring";
+        qDebug() << "Application::onShowTranslateHotkeyPressed() - EXIT";
+        return;
+    }
+    
+    // Show window and insert clipboard text (always, independent of auto-translate setting)
+    qDebug() << "Show and Translate hotkey pressed - showing window and inserting clipboard text";
+    m_mainWindow->showAndActivate();
+    m_mainWindow->insertClipboardText();
+    
+    qDebug() << "Application::onShowTranslateHotkeyPressed() - EXIT";
+}
+
 void Application::onNetworkStatusChanged(bool online) {
     qDebug() << "Application::onNetworkStatusChanged() - ENTRY";
     qDebug() << "Network status changed to:" << (online ? "ONLINE" : "OFFLINE");
@@ -273,6 +311,17 @@ void Application::onSettingsChanged() {
             qDebug() << "Hotkey updated to:" << QKeySequence(hotkeyKey | hotkeyModifiers).toString();
         } else {
             qWarning() << "Cannot update hotkey - m_hotkeyManager is null";
+        }
+        
+        // Update show and translate hotkey if changed
+        if (m_hotkeyManager) {
+            qDebug() << "Updating show and translate hotkey...";
+            int showTranslateKey = AppConfig::instance()->getShowTranslateKey();
+            Qt::KeyboardModifiers showTranslateModifiers = AppConfig::instance()->getShowTranslateModifiers();
+            m_hotkeyManager->updateShowTranslateHotkey(showTranslateKey, showTranslateModifiers);
+            qDebug() << "Show and Translate hotkey updated to:" << QKeySequence(showTranslateKey | showTranslateModifiers).toString();
+        } else {
+            qWarning() << "Cannot update show and translate hotkey - m_hotkeyManager is null";
         }
         
         // Note: Other settings (window position, opacity, etc.) are applied by MainWindow

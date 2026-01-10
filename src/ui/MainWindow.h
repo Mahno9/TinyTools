@@ -26,6 +26,7 @@ public:
 public slots:
     void onSettingsRequested();
     void applyStartupTheme();
+    void onShowTranslateHotkeyPressed();
     
 protected:
     void mousePressEvent(QMouseEvent* event) override;
