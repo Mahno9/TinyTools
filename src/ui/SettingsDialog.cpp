@@ -1,5 +1,6 @@
 #include "SettingsDialog.h"
 #include "../models/AppConfig.h"
+#include "../core/HotkeyManager.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -182,11 +183,11 @@ void SettingsDialog::loadSettings() {
     qDebug() << "Settings loaded successfully from config";
     
     // Load hotkey settings
-    int hotkeyKey = config->getHotkeyKey();
+    int hotkeyKey = config->getHotkeyKey(HotkeyType::MainToggle);
     qDebug() << "Hotkey key from config:" << hotkeyKey;
     m_hotkeyKeyLineEdit->setText(QString::number(hotkeyKey));
     
-    Qt::KeyboardModifiers modifiers = config->getHotkeyModifiers();
+    Qt::KeyboardModifiers modifiers = config->getHotkeyModifiers(HotkeyType::MainToggle);
     qDebug() << "=== LOADING HOTKEY MODIFIERS ===";
     qDebug() << "Modifiers raw value from config:" << static_cast<int>(modifiers);
     
@@ -205,11 +206,11 @@ void SettingsDialog::loadSettings() {
     qDebug() << "Checkbox states set to match config";
     
     // Load show and translate hotkey settings
-    int showTranslateKey = config->getShowTranslateKey();
+    int showTranslateKey = config->getHotkeyKey(HotkeyType::ShowAndTranslate);
     qDebug() << "Show and Translate hotkey key from config:" << showTranslateKey;
     m_showTranslateKeyLineEdit->setText(QString::number(showTranslateKey));
     
-    Qt::KeyboardModifiers showTranslateModifiers = config->getShowTranslateModifiers();
+    Qt::KeyboardModifiers showTranslateModifiers = config->getHotkeyModifiers(HotkeyType::ShowAndTranslate);
     qDebug() << "=== LOADING SHOW AND TRANSLATE HOTKEY MODIFIERS ===";
     qDebug() << "Modifiers raw value from config:" << static_cast<int>(showTranslateModifiers);
     
@@ -284,7 +285,7 @@ void SettingsDialog::saveSettings() {
     
     qDebug() << "Final modifiers value:" << static_cast<int>(modifiers);
     qDebug() << "Calling config->setHotkey()...";
-    config->setHotkey(key, modifiers);
+    config->setHotkey(HotkeyType::MainToggle, key, modifiers);
     qDebug() << "Hotkey settings configured";
     
     // Save show and translate hotkey settings
@@ -323,8 +324,8 @@ void SettingsDialog::saveSettings() {
     }
     
     qDebug() << "Final show and translate modifiers value:" << static_cast<int>(showTranslateModifiers);
-    qDebug() << "Calling config->setShowTranslate()...";
-    config->setShowTranslate(showTranslateKey, showTranslateModifiers);
+    qDebug() << "Calling config->setHotkey()...";
+    config->setHotkey(HotkeyType::ShowAndTranslate, showTranslateKey, showTranslateModifiers);
     qDebug() << "Show and Translate hotkey settings configured";
     
     // Save window settings

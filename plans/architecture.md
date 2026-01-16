@@ -128,33 +128,59 @@ private:
 
 ### 3. Hotkey Manager (`core/HotkeyManager`)
 
-**Purpose:** Handle global hotkey registration and processing
+**Purpose:** Handle global hotkey registration and processing using a type-safe, generic system
 
 **Responsibilities:**
-- Register global hotkeys with Windows API
-- Hotkey press detection
-- Custom hotkey configuration
+- Register multiple global hotkeys with Windows API using type-safe enum identifiers
+- Hotkey press detection and type-aware routing
+- Map-based hotkey storage for dynamic management
 - Hotkey conflict resolution
+- Support for multiple hotkey types (MainToggle, ShowAndTranslate)
 
 **Key Methods:**
 ```cpp
-class HotkeyManager : public QObject {
-    Q_OBJECT
-public:
-    explicit HotkeyManager(QObject* parent = nullptr);
-    bool registerHotkey(int key, Qt::KeyboardModifiers modifiers);
-    bool unregisterHotkey();
-    void setEnabled(bool enabled);
+// Generic hotkey management methods
+bool registerHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers);
+bool unregisterHotkey(HotkeyType::Type type);
+void updateHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers);
+void unregisterAll();
 
-signals:
-    void hotkeyPressed();
+// Query methods
+bool isHotkeyRegistered(HotkeyType::Type type) const;
+int getHotkeyKey(HotkeyType::Type type) const;
+Qt::KeyboardModifiers getHotkeyModifiers(HotkeyType::Type type) const;
 
-private:
-    nativeEventFilter* m_nativeFilter;
-    int m_hotkeyId;
-    bool m_enabled;
-};
+// Enable/disable all hotkeys
+void setEnabled(bool enabled);
+bool isEnabled() const;
 ```
+
+**Signals:**
+```cpp
+signals:
+    void hotkeyPressed(HotkeyType::Type type);
+```
+
+**Private Members:**
+```cpp
+private:
+    struct HotkeyData {
+        int id;
+        int key;
+        Qt::KeyboardModifiers modifiers;
+        bool registered;
+        void* windowHandle;
+    };
+    
+    QMap<HotkeyType::Type, HotkeyData> m_hotkeys;
+    bool m_enabled;
+    static int s_hotkeyIdCounter;
+```
+
+**Note:** The [`HotkeyType`](src/app/Constants.h) enum is used for type-safe hotkey identification with values:
+- `MainToggle = 0` - Toggle window visibility
+- `ShowAndTranslate = 1` - Show window and translate clipboard
+- `Count = 2` - Sentinel value for iteration
 
 ---
 
@@ -327,18 +353,22 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[Global Hotkey Pressed] --> B[Capture by HotkeyManager]
-    B --> C[Signal: hotkeyPressed]
-    C --> D{Window Visible?}
-    D -->|No| E[Show Window]
-    D -->|Yes| F[Hide Window]
-    E --> G[Get Clipboard Text]
-    F --> H[Minimize to Tray]
-    G --> I{Text Available?}
-    I -->|Yes| J[Insert Text to WebView]
-    I -->|No| K[Focus Input Field]
-    J --> L[Bring Window to Front]
-    K --> L
+    A[Global Hotkey Pressed] --> B[HotkeyManager detects hotkey]
+    B --> C{Get HotkeyType from map}
+    C --> D[Signal: hotkeyPressed<br/>with type parameter]
+    D --> E{HotkeyType?}
+    E -->|MainToggle| F{Window Visible?}
+    E -->|ShowAndTranslate| G[Show Window]
+    F -->|No| G
+    F -->|Yes| H[Hide Window]
+    G --> I{Auto-translate enabled?}
+    H --> J[Minimize to Tray]
+    I -->|Yes| K[Get Clipboard Text]
+    I -->|No| L[Bring Window to Front]
+    K --> M{Text Available?}
+    M -->|Yes| N[Insert Text to WebView]
+    M -->|No| L
+    N --> L
 ```
 
 ### WebView Text Injection Flow

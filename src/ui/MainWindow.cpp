@@ -631,17 +631,3 @@ void MainWindow::onSettingsButtonClicked() {
     
     qDebug() << "MainWindow::onSettingsButtonClicked() - EXIT";
 }
-
-void MainWindow::onShowTranslateHotkeyPressed() {
-    qDebug() << "MainWindow::onShowTranslateHotkeyPressed() - ENTRY";
-    
-    // Show and activate the window
-    showAndActivate();
-    qDebug() << "Window shown and activated";
-    
-    // Insert clipboard text into translator (always, independent of auto-translate setting)
-    insertClipboardText();
-    qDebug() << "Clipboard text inserted";
-    
-    qDebug() << "MainWindow::onShowTranslateHotkeyPressed() - EXIT";
-}

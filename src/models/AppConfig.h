@@ -5,6 +5,12 @@
 #include <QPointer>
 #include <QObject>
 #include <QMutex>
+#include <Qt>
+
+// Forward declaration of HotkeyType namespace
+namespace HotkeyType {
+    enum Type;
+}
 
 class AppConfig : public QObject {
     Q_OBJECT
@@ -17,15 +23,10 @@ public:
     void resetToDefaults();
     QString getConfigFilePath() const;
     
-    // Hotkey settings
-    int getHotkeyKey() const;
-    Qt::KeyboardModifiers getHotkeyModifiers() const;
-    void setHotkey(int key, Qt::KeyboardModifiers modifiers);
-    
-    // Show and Translate hotkey settings
-    int getShowTranslateKey() const;
-    Qt::KeyboardModifiers getShowTranslateModifiers() const;
-    void setShowTranslate(int key, Qt::KeyboardModifiers modifiers);
+    // Consolidated hotkey methods
+    int getHotkeyKey(HotkeyType::Type type) const;
+    Qt::KeyboardModifiers getHotkeyModifiers(HotkeyType::Type type) const;
+    void setHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers);
     
     // Window settings
     bool getAlwaysOnTop() const;
@@ -69,6 +70,7 @@ signals:
     
 private:
     AppConfig(); // Private constructor for singleton pattern
+    QString getHotkeyConfigKey(HotkeyType::Type type) const;
     
     static QPointer<AppConfig> s_instance;
     static QMutex s_mutex;

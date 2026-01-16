@@ -16,20 +16,10 @@ HotkeyManager::HotkeyManager(QObject* parent)
     qDebug() << "HotkeyManager::HotkeyManager() - ENTRY";
     qDebug() << "Creating HotkeyManager with parent:" << (parent ? "yes" : "no");
     
-    m_hotkey.id = 0;
-    m_hotkey.key = 0;
-    m_hotkey.modifiers = Qt::NoModifier;
-    m_hotkey.registered = false;
-    m_hotkey.windowHandle = nullptr;  // Initialize window handle
-    qDebug() << "Hotkey data initialized";
-    
-    // Initialize show and translate hotkey
-    m_showTranslateHotkey.id = 0;
-    m_showTranslateHotkey.key = 0;
-    m_showTranslateHotkey.modifiers = Qt::NoModifier;
-    m_showTranslateHotkey.registered = false;
-    m_showTranslateHotkey.windowHandle = nullptr;
-    qDebug() << "Show and Translate hotkey data initialized";
+    // Initialize hotkeys map with default values
+    m_hotkeys[HotkeyType::MainToggle] = {0, 0, Qt::NoModifier, false, nullptr};
+    m_hotkeys[HotkeyType::ShowAndTranslate] = {0, 0, Qt::NoModifier, false, nullptr};
+    qDebug() << "Hotkey data initialized for all hotkey types";
     qDebug() << "Hotkey enabled:" << (m_enabled ? "yes" : "no");
     
     qDebug() << "Installing native event filter...";
@@ -44,9 +34,9 @@ HotkeyManager::~HotkeyManager() {
     qDebug() << "HotkeyManager::~HotkeyManager() - ENTRY";
     qDebug() << "Destroying HotkeyManager";
     
-    qDebug() << "Unregistering any registered hotkey...";
-    unregisterHotkey();
-    qDebug() << "Hotkey unregistered";
+    qDebug() << "Unregistering all registered hotkeys...";
+    unregisterAll();
+    qDebug() << "All hotkeys unregistered";
     
     qDebug() << "Removing native event filter...";
     qApp->removeNativeEventFilter(this);
@@ -61,7 +51,6 @@ void* HotkeyManager::getMainWindowHandle() {
     
 #ifdef _WIN32
     // Try to get MainWindow specifically, not just any active window
-    // This ensures we always use the same window handle
     QWidgetList topLevelWidgets = QApplication::topLevelWidgets();
     for (QWidget* widget : topLevelWidgets) {
         if (widget->objectName() == "MainWindow" || widget->inherits("MainWindow")) {
@@ -86,28 +75,20 @@ void* HotkeyManager::getMainWindowHandle() {
 #endif
 }
 
-bool HotkeyManager::unregisterHotkeyWithHandle(void* hwnd, int hotkeyId) {
-    qDebug() << "HotkeyManager::unregisterHotkeyWithHandle() - ENTRY";
-    qDebug() << "Using window handle:" << hwnd;
-    qDebug() << "Unregistering hotkey with ID:" << hotkeyId;
+bool HotkeyManager::unregisterHotkeyInternal(const HotkeyManager::HotkeyData& hotkey) {
+    qDebug() << "HotkeyManager::unregisterHotkeyInternal() - ENTRY";
+    qDebug() << "Using window handle:" << hotkey.windowHandle;
+    qDebug() << "Unregistering hotkey with ID:" << hotkey.id;
     
 #ifdef _WIN32
     qDebug() << "Unregistering hotkey with Windows API...";
-    BOOL result = UnregisterHotKey((HWND)hwnd, hotkeyId);
+    HWND hwnd = static_cast<HWND>(hotkey.windowHandle);
+    BOOL result = UnregisterHotKey(hwnd, hotkey.id);
     
     if (result) {
         qDebug() << "Hotkey unregistered successfully";
-        if (hotkeyId == m_hotkey.id) {
-            m_hotkey.registered = false;
-            m_hotkey.windowHandle = nullptr;
-            qDebug() << "Hotkey data updated - registered:" << m_hotkey.registered;
-        } else if (hotkeyId == m_showTranslateHotkey.id) {
-            m_showTranslateHotkey.registered = false;
-            m_showTranslateHotkey.windowHandle = nullptr;
-            qDebug() << "Show and Translate hotkey data updated - registered:" << m_showTranslateHotkey.registered;
-        }
         qInfo() << "Unregistered hotkey";
-        qDebug() << "HotkeyManager::unregisterHotkeyWithHandle() - EXIT (returning true)";
+        qDebug() << "HotkeyManager::unregisterHotkeyInternal() - EXIT (returning true)";
         return true;
     } else {
         DWORD error = GetLastError();
@@ -115,49 +96,70 @@ bool HotkeyManager::unregisterHotkeyWithHandle(void* hwnd, int hotkeyId) {
         // Error 1419 means "hotkey is not registered" - this is okay if we're just cleaning up
         if (error == 1419) {
             qDebug() << "Hotkey was not actually registered (error 1419) - this is acceptable";
-            if (hotkeyId == m_hotkey.id) {
-                m_hotkey.registered = false;
-                m_hotkey.windowHandle = nullptr;
-            } else if (hotkeyId == m_showTranslateHotkey.id) {
-                m_showTranslateHotkey.registered = false;
-                m_showTranslateHotkey.windowHandle = nullptr;
-            }
-            qDebug() << "HotkeyManager::unregisterHotkeyWithHandle() - EXIT (returning true)";
+            qDebug() << "HotkeyManager::unregisterHotkeyInternal() - EXIT (returning true)";
             return true;  // Don't treat this as a failure
         }
-        qDebug() << "HotkeyManager::unregisterHotkeyWithHandle() - EXIT (returning false)";
+        qDebug() << "HotkeyManager::unregisterHotkeyInternal() - EXIT (returning false)";
         return false;
     }
 #else
     qDebug() << "Non-Windows platform detected - hotkey unregistration not implemented";
-    qDebug() << "HotkeyManager::unregisterHotkeyWithHandle() - EXIT (returning false)";
+    qDebug() << "HotkeyManager::unregisterHotkeyInternal() - EXIT (returning false)";
     return false;
 #endif
 }
 
-bool HotkeyManager::registerHotkey(int key, Qt::KeyboardModifiers modifiers) {
+HotkeyManager::HotkeyData* HotkeyManager::getHotkeyData(HotkeyType::Type type) {
+    auto it = m_hotkeys.find(type);
+    if (it == m_hotkeys.end()) {
+        return nullptr;
+    }
+    return &it.value();
+}
+
+const HotkeyManager::HotkeyData* HotkeyManager::getHotkeyData(HotkeyType::Type type) const {
+    auto it = m_hotkeys.find(type);
+    if (it == m_hotkeys.end()) {
+        return nullptr;
+    }
+    return &it.value();
+}
+
+bool HotkeyManager::registerHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers) {
     qDebug() << "HotkeyManager::registerHotkey() - ENTRY";
+    qDebug() << "Type:" << HotkeyType::toDisplayName(type);
     qDebug() << "Key:" << key;
     qDebug() << "Modifiers raw value:" << static_cast<int>(modifiers);
     qDebug() << "Modifiers as string:" << QKeySequence(key | modifiers).toString();
+    
+    // Validate type
+    if (type < 0 || type >= HotkeyType::Count) {
+        qWarning() << "Invalid hotkey type:" << type;
+        return false;
+    }
     
     // Detailed modifier breakdown
     qDebug() << "  Qt::ControlModifier present:" << ((modifiers & Qt::ControlModifier) ? "YES" : "NO");
     qDebug() << "  Qt::AltModifier present:" << ((modifiers & Qt::AltModifier) ? "YES" : "NO");
     qDebug() << "  Qt::ShiftModifier present:" << ((modifiers & Qt::ShiftModifier) ? "YES" : "NO");
     
-    // Unregister existing hotkey first using stored window handle
-    if (m_hotkey.registered) {
+    // Get or create hotkey data
+    auto it = m_hotkeys.find(type);
+    HotkeyManager::HotkeyData& hotkey = it.value();
+    
+    // Unregister existing if already registered
+    if (hotkey.registered) {
         qDebug() << "Unregistering existing hotkey before registering new one...";
-        qDebug() << "Using stored window handle for unregistration:" << m_hotkey.windowHandle;
-        unregisterHotkeyWithHandle(m_hotkey.windowHandle, m_hotkey.id);
+        qDebug() << "Using stored window handle for unregistration:" << hotkey.windowHandle;
+        unregisterHotkeyInternal(hotkey);
+        hotkey.registered = false;
         qDebug() << "Existing hotkey unregistered";
     }
     
 #ifdef _WIN32
     qDebug() << "Windows platform detected - using Windows hotkey API";
     
-    UINT vkCode = key;
+    UINT vkCode = static_cast<UINT>(key);
     UINT modifiersCode = 0;
     
     qDebug() << "=== MODIFIER FLAG CALCULATION ===";
@@ -177,33 +179,35 @@ bool HotkeyManager::registerHotkey(int key, Qt::KeyboardModifiers modifiers) {
         qDebug() << "  Qt::ShiftModifier detected - OR-ing with MOD_SHIFT (0x" << QString::number(MOD_SHIFT, 16) << ")";
         qDebug() << "  Current modifiersCode: 0x" << QString::number(modifiersCode, 16);
     }
+    if (modifiers & Qt::MetaModifier) {
+        modifiersCode |= MOD_WIN;
+        qDebug() << "  Qt::MetaModifier detected - OR-ing with MOD_WIN (0x" << QString::number(MOD_WIN, 16) << ")";
+        qDebug() << "  Current modifiersCode: 0x" << QString::number(modifiersCode, 16);
+    }
     qDebug() << "=== FINAL MODIFIER FLAGS ===";
     qDebug() << "Final modifiersCode: 0x" << QString::number(modifiersCode, 16) << "(decimal:" << modifiersCode << ")";
     qDebug() << "Expected flags for Alt+Ctrl: 0x" << QString::number(MOD_ALT | MOD_CONTROL, 16);
     
     // Get and store window handle
-    m_hotkey.windowHandle = getMainWindowHandle();
-    qDebug() << "Window handle for registration:" << m_hotkey.windowHandle;
+    hotkey.windowHandle = getMainWindowHandle();
+    qDebug() << "Window handle for registration:" << hotkey.windowHandle;
     
     // Register hotkey with Windows
-    m_hotkey.id = ++s_hotkeyIdCounter;
-    qDebug() << "New hotkey ID:" << m_hotkey.id;
+    hotkey.id = ++s_hotkeyIdCounter;
+    qDebug() << "New hotkey ID:" << hotkey.id;
     
     qDebug() << "=== REGISTERHOTKEY CALL ===";
     qDebug() << "Calling RegisterHotKey with parameters:";
-    qDebug() << "  HWND (window handle):" << m_hotkey.windowHandle;
-    qDebug() << "  ID:" << m_hotkey.id;
+    qDebug() << "  HWND (window handle):" << hotkey.windowHandle;
+    qDebug() << "  ID:" << hotkey.id;
     qDebug() << "  fsModifiers (flags): 0x" << QString::number(modifiersCode, 16) << "(decimal:" << modifiersCode << ")";
     qDebug() << "  vk (virtual key code):" << vkCode << "(0x" << QString::number(vkCode, 16) << ")";
-    qDebug() << "Expected for Alt+Win+T:";
-    qDebug() << "  fsModifiers should be: 0x" << QString::number(MOD_ALT | MOD_WIN, 16);
-    qDebug() << "  vk should be: 84 (0x54 for 'T')";
     
-    HWND hwnd = (HWND)m_hotkey.windowHandle;
+    HWND hwnd = static_cast<HWND>(hotkey.windowHandle);
     
     // Log window handle details before calling RegisterHotKey
     qDebug() << "=== WINDOW HANDLE DETAILS ===";
-    qDebug() << "Window handle pointer:" << m_hotkey.windowHandle;
+    qDebug() << "Window handle pointer:" << hotkey.windowHandle;
     qDebug() << "Window handle (HWND cast):" << hwnd;
     qDebug() << "Window handle is NULL:" << (hwnd == NULL ? "YES" : "NO");
     qDebug() << "Window handle in hex:" << QString::number((quintptr)hwnd, 16);
@@ -211,7 +215,7 @@ bool HotkeyManager::registerHotkey(int key, Qt::KeyboardModifiers modifiers) {
     
     BOOL result = RegisterHotKey(
         hwnd,
-        m_hotkey.id,
+        hotkey.id,
         modifiersCode,
         vkCode
     );
@@ -220,12 +224,13 @@ bool HotkeyManager::registerHotkey(int key, Qt::KeyboardModifiers modifiers) {
     
     if (result) {
         qDebug() << "Hotkey registered successfully";
-        m_hotkey.key = key;
-        m_hotkey.modifiers = modifiers;
-        m_hotkey.registered = true;
-        qDebug() << "Hotkey data updated - registered:" << m_hotkey.registered;
-        qDebug() << "Stored window handle:" << m_hotkey.windowHandle;
-        qInfo() << "Registered hotkey:" << QKeySequence(key | modifiers).toString();
+        hotkey.key = key;
+        hotkey.modifiers = modifiers;
+        hotkey.registered = true;
+        qDebug() << "Hotkey data updated - registered:" << hotkey.registered;
+        qDebug() << "Stored window handle:" << hotkey.windowHandle;
+        qInfo() << "Registered hotkey:" << HotkeyType::toDisplayName(type)
+                << "as:" << QKeySequence(key | modifiers).toString();
         qDebug() << "HotkeyManager::registerHotkey() - EXIT (returning true)";
         return true;
     } else {
@@ -259,7 +264,7 @@ bool HotkeyManager::registerHotkey(int key, Qt::KeyboardModifiers modifiers) {
             qWarning() << "Attempting to register with NULL window handle instead...";
             
             HWND nullHwnd = NULL;
-            result = RegisterHotKey(nullHwnd, m_hotkey.id, modifiersCode, vkCode);
+            result = RegisterHotKey(nullHwnd, hotkey.id, modifiersCode, vkCode);
             
             qWarning() << "RegisterHotKey with NULL handle returned:" << (result ? "TRUE (success)" : "FALSE (failure)");
             
@@ -267,11 +272,12 @@ bool HotkeyManager::registerHotkey(int key, Qt::KeyboardModifiers modifiers) {
                 qWarning() << "=== WIN KEY WORKAROUND SUCCESSFUL ===";
                 qWarning() << "Hotkey registered successfully with NULL window handle";
                 qWarning() << "This is a workaround for Windows API Win key restrictions";
-                m_hotkey.key = key;
-                m_hotkey.modifiers = modifiers;
-                m_hotkey.registered = true;
-                m_hotkey.windowHandle = nullptr; // Store NULL handle
-                qInfo() << "Registered hotkey (with Win key workaround):" << QKeySequence(key | modifiers).toString();
+                hotkey.key = key;
+                hotkey.modifiers = modifiers;
+                hotkey.registered = true;
+                hotkey.windowHandle = nullptr; // Store NULL handle
+                qInfo() << "Registered hotkey (with Win key workaround):" << HotkeyType::toDisplayName(type)
+                        << "as:" << QKeySequence(key | modifiers).toString();
                 qDebug() << "HotkeyManager::registerHotkey() - EXIT (returning true)";
                 return true;
             } else {
@@ -287,206 +293,101 @@ bool HotkeyManager::registerHotkey(int key, Qt::KeyboardModifiers modifiers) {
         return false;
     }
 #else
-    // Linux implementation using QxtGlobalShortcut
-    qDebug() << "Non-Windows platform detected - hotkey registration not implemented";
     Q_UNUSED(key);
     Q_UNUSED(modifiers);
+    qDebug() << "Non-Windows platform detected - hotkey registration not implemented";
     qWarning() << "Hotkey registration not supported on this platform";
     qDebug() << "HotkeyManager::registerHotkey() - EXIT (returning false)";
     return false;
 #endif
 }
 
-bool HotkeyManager::registerShowTranslateHotkey(int key, Qt::KeyboardModifiers modifiers) {
-    qDebug() << "HotkeyManager::registerShowTranslateHotkey() - ENTRY";
-    qDebug() << "Key:" << key;
-    qDebug() << "Modifiers raw value:" << static_cast<int>(modifiers);
-    qDebug() << "Modifiers as string:" << QKeySequence(key | modifiers).toString();
+bool HotkeyManager::unregisterHotkey(HotkeyType::Type type) {
+    qDebug() << "HotkeyManager::unregisterHotkey() - ENTRY";
+    qDebug() << "Type:" << HotkeyType::toDisplayName(type);
     
-    // Detailed modifier breakdown
-    qDebug() << "  Qt::ControlModifier present:" << ((modifiers & Qt::ControlModifier) ? "YES" : "NO");
-    qDebug() << "  Qt::AltModifier present:" << ((modifiers & Qt::AltModifier) ? "YES" : "NO");
-    qDebug() << "  Qt::ShiftModifier present:" << ((modifiers & Qt::ShiftModifier) ? "YES" : "NO");
-    
-    // Unregister existing show and translate hotkey first using stored window handle
-    if (m_showTranslateHotkey.registered) {
-        qDebug() << "Unregistering existing show and translate hotkey before registering new one...";
-        qDebug() << "Using stored window handle for unregistration:" << m_showTranslateHotkey.windowHandle;
-        unregisterHotkeyWithHandle(m_showTranslateHotkey.windowHandle, m_showTranslateHotkey.id);
-        qDebug() << "Existing show and translate hotkey unregistered";
-    }
-    
-#ifdef _WIN32
-    qDebug() << "Windows platform detected - using Windows hotkey API";
-    
-    UINT vkCode = key;
-    UINT modifiersCode = 0;
-    
-    qDebug() << "=== MODIFIER FLAG CALCULATION ===";
-    qDebug() << "Starting with modifiersCode = 0";
-    if (modifiers & Qt::ControlModifier) {
-        modifiersCode |= MOD_CONTROL;
-        qDebug() << "  Qt::ControlModifier detected - OR-ing with MOD_CONTROL (0x" << QString::number(MOD_CONTROL, 16) << ")";
-        qDebug() << "  Current modifiersCode: 0x" << QString::number(modifiersCode, 16);
-    }
-    if (modifiers & Qt::AltModifier) {
-        modifiersCode |= MOD_ALT;
-        qDebug() << "  Qt::AltModifier detected - OR-ing with MOD_ALT (0x" << QString::number(MOD_ALT, 16) << ")";
-        qDebug() << "  Current modifiersCode: 0x" << QString::number(modifiersCode, 16);
-    }
-    if (modifiers & Qt::ShiftModifier) {
-        modifiersCode |= MOD_SHIFT;
-        qDebug() << "  Qt::ShiftModifier detected - OR-ing with MOD_SHIFT (0x" << QString::number(MOD_SHIFT, 16) << ")";
-        qDebug() << "  Current modifiersCode: 0x" << QString::number(modifiersCode, 16);
-    }
-    qDebug() << "=== FINAL MODIFIER FLAGS ===";
-    qDebug() << "Final modifiersCode: 0x" << QString::number(modifiersCode, 16) << "(decimal:" << modifiersCode << ")";
-    
-    // Get and store window handle
-    m_showTranslateHotkey.windowHandle = getMainWindowHandle();
-    qDebug() << "Window handle for registration:" << m_showTranslateHotkey.windowHandle;
-    
-    // Register hotkey with Windows
-    m_showTranslateHotkey.id = ++s_hotkeyIdCounter;
-    qDebug() << "New show and translate hotkey ID:" << m_showTranslateHotkey.id;
-    
-    qDebug() << "=== REGISTERHOTKEY CALL (Show and Translate) ===";
-    qDebug() << "Calling RegisterHotKey with parameters:";
-    qDebug() << "  HWND (window handle):" << m_showTranslateHotkey.windowHandle;
-    qDebug() << "  ID:" << m_showTranslateHotkey.id;
-    qDebug() << "  fsModifiers (flags): 0x" << QString::number(modifiersCode, 16) << "(decimal:" << modifiersCode << ")";
-    qDebug() << "  vk (virtual key code):" << vkCode << "(0x" << QString::number(vkCode, 16) << ")";
-    
-    HWND hwnd = (HWND)m_showTranslateHotkey.windowHandle;
-    
-    BOOL result = RegisterHotKey(
-        hwnd,
-        m_showTranslateHotkey.id,
-        modifiersCode,
-        vkCode
-    );
-    
-    qDebug() << "RegisterHotKey returned:" << (result ? "TRUE (success)" : "FALSE (failure)");
-    
-    if (result) {
-        qDebug() << "Show and Translate hotkey registered successfully";
-        m_showTranslateHotkey.key = key;
-        m_showTranslateHotkey.modifiers = modifiers;
-        m_showTranslateHotkey.registered = true;
-        qDebug() << "Show and Translate hotkey data updated - registered:" << m_showTranslateHotkey.registered;
-        qDebug() << "Stored window handle:" << m_showTranslateHotkey.windowHandle;
-        qInfo() << "Registered show and translate hotkey:" << QKeySequence(key | modifiers).toString();
-        qDebug() << "HotkeyManager::registerShowTranslateHotkey() - EXIT (returning true)";
-        return true;
-    } else {
-        DWORD error = GetLastError();
-        qCritical() << "=== REGISTERHOTKEY FAILED (Show and Translate) ===";
-        qCritical() << "Windows error code:" << error;
-        qCritical() << "Error code in hex: 0x" << QString::number(error, 16);
-        
-        // Detailed error descriptions
-        switch (error) {
-            case 1409: // ERROR_HOTKEY_ALREADY_REGISTERED
-                qCritical() << "ERROR_HOTKEY_ALREADY_REGISTERED (1409) - Hotkey already registered by this or another application";
-                break;
-            case 87: // ERROR_INVALID_PARAMETER
-                qCritical() << "ERROR_INVALID_PARAMETER (87) - Invalid parameter passed to RegisterHotKey";
-                break;
-            default:
-                qCritical() << "Unknown error - Error code:" << error;
-                break;
-        }
-        
-        qDebug() << "HotkeyManager::registerShowTranslateHotkey() - EXIT (returning false)";
+    HotkeyManager::HotkeyData* hotkey = getHotkeyData(type);
+    if (!hotkey) {
+        qWarning() << "Hotkey type not found:" << type;
+        qDebug() << "HotkeyManager::unregisterHotkey() - EXIT (returning false)";
         return false;
     }
-#else
-    qDebug() << "Non-Windows platform detected - show and translate hotkey registration not implemented";
-    Q_UNUSED(key);
-    Q_UNUSED(modifiers);
-    qWarning() << "Show and translate hotkey registration not supported on this platform";
-    qDebug() << "HotkeyManager::registerShowTranslateHotkey() - EXIT (returning false)";
-    return false;
-#endif
+    
+    if (!hotkey->registered) {
+        qDebug() << "Hotkey not registered - nothing to do";
+        qDebug() << "HotkeyManager::unregisterHotkey() - EXIT (returning true)";
+        return true;
+    }
+    
+    qDebug() << "Unregistering hotkey...";
+    qDebug() << "Using stored window handle for unregistration:" << hotkey->windowHandle;
+    bool result = unregisterHotkeyInternal(*hotkey);
+    hotkey->registered = false;
+    hotkey->windowHandle = nullptr;
+    qDebug() << "Hotkey unregistered";
+    
+    qDebug() << "HotkeyManager::unregisterHotkey() - EXIT (returning" << (result ? "true" : "false") << ")";
+    return result;
 }
 
-bool HotkeyManager::unregisterHotkey() {
-    qDebug() << "HotkeyManager::unregisterHotkey() - ENTRY";
+void HotkeyManager::unregisterAll() {
+    qDebug() << "HotkeyManager::unregisterAll() - ENTRY";
     
-    // Unregister main hotkey
-    if (m_hotkey.registered) {
-        qDebug() << "Unregistering main hotkey...";
-        qDebug() << "Using stored window handle for unregistration:" << m_hotkey.windowHandle;
-        unregisterHotkeyWithHandle(m_hotkey.windowHandle, m_hotkey.id);
-        qDebug() << "Main hotkey unregistered";
+    for (auto it = m_hotkeys.begin(); it != m_hotkeys.end(); ++it) {
+        HotkeyType::Type type = it.key();
+        HotkeyManager::HotkeyData& hotkey = it.value();
+        
+        if (hotkey.registered) {
+            qDebug() << "Unregistering hotkey:" << HotkeyType::toDisplayName(type);
+            unregisterHotkeyInternal(hotkey);
+            hotkey.registered = false;
+            hotkey.windowHandle = nullptr;
+        }
     }
     
-    // Unregister show and translate hotkey
-    if (m_showTranslateHotkey.registered) {
-        qDebug() << "Unregistering show and translate hotkey...";
-        qDebug() << "Using stored window handle for unregistration:" << m_showTranslateHotkey.windowHandle;
-        unregisterHotkeyWithHandle(m_showTranslateHotkey.windowHandle, m_showTranslateHotkey.id);
-        qDebug() << "Show and translate hotkey unregistered";
-    }
-    
-    if (!m_hotkey.registered && !m_showTranslateHotkey.registered) {
-        qDebug() << "No hotkeys registered - nothing to do";
-    }
-    
-    qDebug() << "HotkeyManager::unregisterHotkey() - EXIT (returning true)";
-    return true;
+    qDebug() << "All hotkeys unregistered";
+    qDebug() << "HotkeyManager::unregisterAll() - EXIT";
 }
 
-void HotkeyManager::updateHotkey(int keyCode, Qt::KeyboardModifiers modifiers) {
+void HotkeyManager::updateHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers) {
     qDebug() << "HotkeyManager::updateHotkey() - ENTRY";
-    qDebug() << "New key:" << keyCode;
-    qDebug() << "New modifiers:" << QKeySequence(keyCode | modifiers).toString();
+    qDebug() << "Type:" << HotkeyType::toDisplayName(type);
+    qDebug() << "New key:" << key;
+    qDebug() << "New modifiers:" << QKeySequence(key | modifiers).toString();
     
-    // Unregister existing hotkey first using stored window handle
-    if (m_hotkey.registered) {
-        qDebug() << "Unregistering existing hotkey...";
-        qDebug() << "Using stored window handle:" << m_hotkey.windowHandle;
-        unregisterHotkeyWithHandle(m_hotkey.windowHandle, m_hotkey.id);
-        qDebug() << "Existing hotkey unregistered";
+    if (!m_hotkeys.contains(type)) {
+        qWarning() << "Hotkey type not found:" << type;
+        return;
     }
     
-    // Register new hotkey
-    qDebug() << "Registering new hotkey...";
-    bool registered = registerHotkey(keyCode, modifiers);
-    if (registered) {
-        qDebug() << "Hotkey updated successfully";
-        qInfo() << "Updated hotkey to:" << QKeySequence(keyCode | modifiers).toString();
-    } else {
-        qWarning() << "Failed to update hotkey";
-    }
+    unregisterHotkey(type);
+    registerHotkey(type, key, modifiers);
     
     qDebug() << "HotkeyManager::updateHotkey() - EXIT";
 }
 
-void HotkeyManager::updateShowTranslateHotkey(int keyCode, Qt::KeyboardModifiers modifiers) {
-    qDebug() << "HotkeyManager::updateShowTranslateHotkey() - ENTRY";
-    qDebug() << "New key:" << keyCode;
-    qDebug() << "New modifiers:" << QKeySequence(keyCode | modifiers).toString();
-    
-    // Unregister existing show and translate hotkey first using stored window handle
-    if (m_showTranslateHotkey.registered) {
-        qDebug() << "Unregistering existing show and translate hotkey...";
-        qDebug() << "Using stored window handle:" << m_showTranslateHotkey.windowHandle;
-        unregisterHotkeyWithHandle(m_showTranslateHotkey.windowHandle, m_showTranslateHotkey.id);
-        qDebug() << "Existing show and translate hotkey unregistered";
+bool HotkeyManager::isHotkeyRegistered(HotkeyType::Type type) const {
+    const HotkeyManager::HotkeyData* hotkey = getHotkeyData(type);
+    if (!hotkey) {
+        return false;
     }
-    
-    // Register new show and translate hotkey
-    qDebug() << "Registering new show and translate hotkey...";
-    bool registered = registerShowTranslateHotkey(keyCode, modifiers);
-    if (registered) {
-        qDebug() << "Show and Translate hotkey updated successfully";
-        qInfo() << "Updated show and translate hotkey to:" << QKeySequence(keyCode | modifiers).toString();
-    } else {
-        qWarning() << "Failed to update show and translate hotkey";
+    return hotkey->registered;
+}
+
+int HotkeyManager::getHotkeyKey(HotkeyType::Type type) const {
+    const HotkeyManager::HotkeyData* hotkey = getHotkeyData(type);
+    if (!hotkey) {
+        return 0;
     }
-    
-    qDebug() << "HotkeyManager::updateShowTranslateHotkey() - EXIT";
+    return hotkey->key;
+}
+
+Qt::KeyboardModifiers HotkeyManager::getHotkeyModifiers(HotkeyType::Type type) const {
+    const HotkeyManager::HotkeyData* hotkey = getHotkeyData(type);
+    if (!hotkey) {
+        return Qt::NoModifier;
+    }
+    return hotkey->modifiers;
 }
 
 void HotkeyManager::setEnabled(bool enabled) {
@@ -503,27 +404,20 @@ bool HotkeyManager::nativeEventFilter(const QByteArray& eventType,
                                        void* message,
                                        qintptr* result) {
 #ifdef _WIN32
-    if (eventType == "windows_generic_MSG") {
+    if (eventType == "windows_generic_MSG" && m_enabled) {
         MSG* msg = static_cast<MSG*>(message);
         
-        if (msg->message == WM_HOTKEY && m_enabled) {
-            qDebug() << "Hotkey event received";
-            qDebug() << "Hotkey ID:" << (int)msg->wParam;
-            qDebug() << "Expected main hotkey ID:" << m_hotkey.id;
-            qDebug() << "Expected show and translate hotkey ID:" << m_showTranslateHotkey.id;
-            
-            if (m_hotkey.registered && msg->wParam == m_hotkey.id) {
-                qDebug() << "Main hotkey ID matches - emitting hotkeyPressed signal";
-                emit hotkeyPressed();
-                qDebug() << "hotkeyPressed signal emitted";
-                return true;
-            } else if (m_showTranslateHotkey.registered && msg->wParam == m_showTranslateHotkey.id) {
-                qDebug() << "Show and Translate hotkey ID matches - emitting showTranslateHotkeyPressed signal";
-                emit showTranslateHotkeyPressed();
-                qDebug() << "showTranslateHotkeyPressed signal emitted";
-                return true;
-            } else {
-                qDebug() << "Hotkey ID does not match - ignoring event";
+        if (msg->message == WM_HOTKEY) {
+            // Find hotkey by ID
+            for (auto it = m_hotkeys.constBegin(); it != m_hotkeys.constEnd(); ++it) {
+                const HotkeyManager::HotkeyData& hotkey = it.value();
+                if (hotkey.registered && msg->wParam == hotkey.id) {
+                    qDebug() << "Hotkey pressed:" << HotkeyType::toDisplayName(it.key());
+                    qDebug() << "Emitting hotkeyPressed signal with type:" << it.key();
+                    emit hotkeyPressed(it.key());
+                    qDebug() << "hotkeyPressed signal emitted";
+                    return true;
+                }
             }
         }
     }

@@ -1,7 +1,9 @@
 #include <QtTest>
 #include "../../src/models/AppConfig.h"
+#include "../../src/core/HotkeyManager.h"
 #include <QFile>
 #include <QDir>
+#include <QStandardPaths>
 
 class TestConfig : public QObject {
     Q_OBJECT
@@ -16,10 +18,10 @@ private slots:
 void TestConfig::testDefaultValues() {
     AppConfig config;
     
-    QCOMPARE(config.getHotkeyKey(), static_cast<int>(Qt::Key_T));
+    QCOMPARE(config.getHotkeyKey(HotkeyType::MainToggle), static_cast<int>(Qt::Key_T));
     QCOMPARE(config.getWindowOpacity(), 90);
     QCOMPARE(config.getAlwaysOnTop(), true);
-    QCOMPARE(config.getAutoStart(), true);
+    QCOMPARE(config.getAutoStartOnLogin(), false);
     QCOMPARE(config.getMinimizeToTray(), true);
 }
 
@@ -46,8 +48,8 @@ void TestConfig::testSetAndGetValues() {
     QCOMPARE(config.getWindowY(), 300);
     
     // Test general settings
-    config.setAutoStart(false);
-    QCOMPARE(config.getAutoStart(), false);
+    config.setAutoStartOnLogin(false);
+    QCOMPARE(config.getAutoStartOnLogin(), false);
     
     config.setMinimizeToTray(false);
     QCOMPARE(config.getMinimizeToTray(), false);

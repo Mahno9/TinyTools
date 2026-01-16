@@ -1,4 +1,5 @@
 #include "AppConfig.h"
+#include "../core/HotkeyManager.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QStandardPaths>
@@ -145,23 +146,30 @@ bool AppConfig::save() {
 }
 
 void AppConfig::resetToDefaults() {
-    // Hotkey: Ctrl+Alt+T
-    QJsonObject hotkey;
-    hotkey["key"] = static_cast<int>(Qt::Key_T);
-    QJsonArray modifiers;
-    modifiers.append(static_cast<int>(Qt::ControlModifier));
-    modifiers.append(static_cast<int>(Qt::AltModifier));
-    hotkey["modifiers"] = modifiers;
-    m_config["hotkey"] = hotkey;
-    
-    // Show and Translate hotkey: Ctrl+Alt+S
-    QJsonObject showTranslateHotkey;
-    showTranslateHotkey["key"] = static_cast<int>(Qt::Key_S);
-    QJsonArray showTranslateModifiers;
-    showTranslateModifiers.append(static_cast<int>(Qt::ControlModifier));
-    showTranslateModifiers.append(static_cast<int>(Qt::AltModifier));
-    showTranslateHotkey["modifiers"] = showTranslateModifiers;
-    m_config["showTranslateHotkey"] = showTranslateHotkey;
+    // Initialize all hotkeys using loop
+    for (int i = 0; i < HotkeyType::Count; ++i) {
+        HotkeyType::Type type = static_cast<HotkeyType::Type>(i);
+        
+        int defaultKey;
+        Qt::KeyboardModifiers defaultModifiers;
+        
+        switch (type) {
+            case HotkeyType::MainToggle:
+                defaultKey = Qt::Key_T;
+                defaultModifiers = Qt::ControlModifier | Qt::AltModifier;
+                break;
+            case HotkeyType::ShowAndTranslate:
+                defaultKey = Qt::Key_S;
+                defaultModifiers = Qt::ControlModifier | Qt::AltModifier;
+                break;
+            default:
+                defaultKey = 0;
+                defaultModifiers = Qt::NoModifier;
+                break;
+        }
+        
+        setHotkey(type, defaultKey, defaultModifiers);
+    }
     
     // Window settings
     QJsonObject window;
@@ -187,24 +195,39 @@ void AppConfig::resetToDefaults() {
     m_config["translation"] = translation;
 }
 
-int AppConfig::getHotkeyKey() const {
-    QJsonObject hotkey = m_config["hotkey"].toObject();
+QString AppConfig::getHotkeyConfigKey(HotkeyType::Type type) const {
+    switch (type) {
+        case HotkeyType::MainToggle:
+            return "hotkey";
+        case HotkeyType::ShowAndTranslate:
+            return "showTranslateHotkey";
+        default:
+            return "unknown";
+    }
+}
+
+// Generic hotkey methods
+int AppConfig::getHotkeyKey(HotkeyType::Type type) const {
+    QString configKey = getHotkeyConfigKey(type);
+    QJsonObject hotkey = m_config[configKey].toObject();
     return hotkey["key"].toInt();
 }
 
-Qt::KeyboardModifiers AppConfig::getHotkeyModifiers() const {
-    QJsonObject hotkey = m_config["hotkey"].toObject();
+Qt::KeyboardModifiers AppConfig::getHotkeyModifiers(HotkeyType::Type type) const {
+    QString configKey = getHotkeyConfigKey(type);
+    QJsonObject hotkey = m_config[configKey].toObject();
     QJsonArray modifiersArray = hotkey["modifiers"].toArray();
     
     Qt::KeyboardModifiers modifiers = Qt::NoModifier;
     for (const QJsonValue& value : modifiersArray) {
         modifiers |= static_cast<Qt::KeyboardModifier>(value.toInt());
     }
-    
     return modifiers;
 }
 
-void AppConfig::setHotkey(int key, Qt::KeyboardModifiers modifiers) {
+void AppConfig::setHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers) {
+    QString configKey = getHotkeyConfigKey(type);
+    
     QJsonObject hotkey;
     hotkey["key"] = key;
     
@@ -217,40 +240,7 @@ void AppConfig::setHotkey(int key, Qt::KeyboardModifiers modifiers) {
         modifiersArray.append(static_cast<int>(Qt::ShiftModifier));
     
     hotkey["modifiers"] = modifiersArray;
-    m_config["hotkey"] = hotkey;
-}
-
-int AppConfig::getShowTranslateKey() const {
-    QJsonObject showTranslateHotkey = m_config["showTranslateHotkey"].toObject();
-    return showTranslateHotkey["key"].toInt();
-}
-
-Qt::KeyboardModifiers AppConfig::getShowTranslateModifiers() const {
-    QJsonObject showTranslateHotkey = m_config["showTranslateHotkey"].toObject();
-    QJsonArray modifiersArray = showTranslateHotkey["modifiers"].toArray();
-    
-    Qt::KeyboardModifiers modifiers = Qt::NoModifier;
-    for (const QJsonValue& value : modifiersArray) {
-        modifiers |= static_cast<Qt::KeyboardModifier>(value.toInt());
-    }
-    
-    return modifiers;
-}
-
-void AppConfig::setShowTranslate(int key, Qt::KeyboardModifiers modifiers) {
-    QJsonObject showTranslateHotkey;
-    showTranslateHotkey["key"] = key;
-    
-    QJsonArray modifiersArray;
-    if (modifiers & Qt::ControlModifier)
-        modifiersArray.append(static_cast<int>(Qt::ControlModifier));
-    if (modifiers & Qt::AltModifier)
-        modifiersArray.append(static_cast<int>(Qt::AltModifier));
-    if (modifiers & Qt::ShiftModifier)
-        modifiersArray.append(static_cast<int>(Qt::ShiftModifier));
-    
-    showTranslateHotkey["modifiers"] = modifiersArray;
-    m_config["showTranslateHotkey"] = showTranslateHotkey;
+    m_config[configKey] = hotkey;
 }
 
 bool AppConfig::getAlwaysOnTop() const {

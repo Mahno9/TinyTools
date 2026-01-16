@@ -2,6 +2,31 @@
 #include <QObject>
 #include <QKeySequence>
 #include <QAbstractNativeEventFilter>
+#include <QMap>
+
+namespace HotkeyType {
+    enum Type {
+        MainToggle = 0,
+        ShowAndTranslate,
+        Count
+    };
+    
+    inline const char* toString(Type type) {
+        switch (type) {
+            case MainToggle: return "hotkey";
+            case ShowAndTranslate: return "showTranslateHotkey";
+            default: return "unknown";
+        }
+    }
+    
+    inline const char* toDisplayName(Type type) {
+        switch (type) {
+            case MainToggle: return "Main Toggle";
+            case ShowAndTranslate: return "Show and Translate";
+            default: return "Unknown";
+        }
+    }
+}
 
 class HotkeyManager : public QObject, public QAbstractNativeEventFilter {
     Q_OBJECT
@@ -10,11 +35,18 @@ public:
     explicit HotkeyManager(QObject* parent = nullptr);
     ~HotkeyManager();
     
-    bool registerHotkey(int key, Qt::KeyboardModifiers modifiers);
-    bool registerShowTranslateHotkey(int key, Qt::KeyboardModifiers modifiers);
-    bool unregisterHotkey();
-    void updateHotkey(int keyCode, Qt::KeyboardModifiers modifiers);
-    void updateShowTranslateHotkey(int keyCode, Qt::KeyboardModifiers modifiers);
+    // Generic hotkey management methods
+    bool registerHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers);
+    bool unregisterHotkey(HotkeyType::Type type);
+    void updateHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers);
+    void unregisterAll();
+    
+    // Query methods
+    bool isHotkeyRegistered(HotkeyType::Type type) const;
+    int getHotkeyKey(HotkeyType::Type type) const;
+    Qt::KeyboardModifiers getHotkeyModifiers(HotkeyType::Type type) const;
+    
+    // Enable/disable all hotkeys
     void setEnabled(bool enabled);
     bool isEnabled() const { return m_enabled; }
     
@@ -24,8 +56,7 @@ protected:
                           qintptr* result) override;
     
 signals:
-    void hotkeyPressed();
-    void showTranslateHotkeyPressed();
+    void hotkeyPressed(HotkeyType::Type type);
     
 private:
     struct HotkeyData {
@@ -33,15 +64,19 @@ private:
         int key;
         Qt::KeyboardModifiers modifiers;
         bool registered;
-        void* windowHandle;  // Store HWND used for registration
+        void* windowHandle;
     };
     
-    HotkeyData m_hotkey;
-    HotkeyData m_showTranslateHotkey;
+    // Map-based storage for dynamic hotkey management
+    QMap<HotkeyType::Type, HotkeyData> m_hotkeys;
     bool m_enabled;
     static int s_hotkeyIdCounter;
     
-    // Helper methods for consistent window handle handling
+    // Helper methods
     void* getMainWindowHandle();
-    bool unregisterHotkeyWithHandle(void* hwnd, int hotkeyId);
+    bool unregisterHotkeyInternal(const HotkeyData& hotkey);
+    HotkeyData* getHotkeyData(HotkeyType::Type type);
+    const HotkeyData* getHotkeyData(HotkeyType::Type type) const;
+    
+    Q_DISABLE_COPY(HotkeyManager)
 };

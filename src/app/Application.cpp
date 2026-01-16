@@ -39,8 +39,8 @@ void Application::initialize() {
             qDebug() << "Window position:" << AppConfig::instance()->getWindowX() << "," << AppConfig::instance()->getWindowY();
             qDebug() << "Always on top:" << (AppConfig::instance()->getAlwaysOnTop() ? "yes" : "no");
             qDebug() << "Window opacity:" << AppConfig::instance()->getWindowOpacity() << "%";
-            qDebug() << "Hotkey key:" << AppConfig::instance()->getHotkeyKey();
-            qDebug() << "Hotkey modifiers:" << QKeySequence(AppConfig::instance()->getHotkeyKey() | AppConfig::instance()->getHotkeyModifiers()).toString();
+            qDebug() << "Main hotkey key:" << AppConfig::instance()->getHotkeyKey(HotkeyType::MainToggle);
+            qDebug() << "Main hotkey modifiers:" << QKeySequence(AppConfig::instance()->getHotkeyKey(HotkeyType::MainToggle) | AppConfig::instance()->getHotkeyModifiers(HotkeyType::MainToggle)).toString();
         }
         qDebug() << "Step 1 complete: Configuration loaded";
         
@@ -106,27 +106,10 @@ void Application::setupComponents() {
     m_hotkeyManager = new HotkeyManager(this);
     qDebug() << "[Component 3/5] HotkeyManager created successfully";
     
-    // Register hotkey from configuration (will use defaults if config not loaded yet)
-    qDebug() << "[Component 3/5] Registering hotkey from configuration...";
-    int hotkeyKey = AppConfig::instance()->getHotkeyKey();
-    Qt::KeyboardModifiers hotkeyModifiers = AppConfig::instance()->getHotkeyModifiers();
-    bool hotkeyRegistered = m_hotkeyManager->registerHotkey(hotkeyKey, hotkeyModifiers);
-    if (hotkeyRegistered) {
-        qDebug() << "[Component 3/5] Hotkey registered successfully:" << QKeySequence(hotkeyKey | hotkeyModifiers).toString();
-    } else {
-        qWarning() << "[Component 3/5] Failed to register hotkey";
-    }
-    
-    // Register show and translate hotkey from configuration
-    qDebug() << "[Component 3.5] Registering show and translate hotkey from configuration...";
-    int showTranslateKey = AppConfig::instance()->getShowTranslateKey();
-    Qt::KeyboardModifiers showTranslateModifiers = AppConfig::instance()->getShowTranslateModifiers();
-    bool showTranslateRegistered = m_hotkeyManager->registerShowTranslateHotkey(showTranslateKey, showTranslateModifiers);
-    if (showTranslateRegistered) {
-        qDebug() << "[Component 3.5] Show and translate hotkey registered successfully:" << QKeySequence(showTranslateKey | showTranslateModifiers).toString();
-    } else {
-        qWarning() << "[Component 3.5] Failed to register show and translate hotkey";
-    }
+    // Register all hotkeys from configuration
+    qDebug() << "[Component 3/5] Registering hotkeys from configuration...";
+    registerAllHotkeys();
+    qDebug() << "[Component 3/5] Hotkeys registered successfully";
     
     // Create main window
     qDebug() << "[Component 4/5] Creating MainWindow...";
@@ -158,25 +141,15 @@ void Application::connectSignals() {
     qDebug() << "Application::connectSignals() - ENTRY";
     qDebug() << "Connecting signal-slot connections...";
     
-    // Hotkey activation
+    // Hotkey activation - single connection with type parameter
     qDebug() << "Connecting HotkeyManager::hotkeyPressed to Application::onHotkeyPressed...";
     if (!m_hotkeyManager) {
         qCritical() << "ERROR: Cannot connect hotkey signal - m_hotkeyManager is null";
         throw std::runtime_error("HotkeyManager is null");
     }
     connect(m_hotkeyManager, &HotkeyManager::hotkeyPressed,
-            this, &Application::onHotkeyPressed);
+            this, &Application::onHotkeyPressed, Qt::UniqueConnection);
     qDebug() << "Hotkey signal connected successfully";
-    
-    // Show and Translate hotkey activation
-    qDebug() << "Connecting HotkeyManager::showTranslateHotkeyPressed to Application::onShowTranslateHotkeyPressed...";
-    if (!m_hotkeyManager) {
-        qCritical() << "ERROR: Cannot connect show translate hotkey signal - m_hotkeyManager is null";
-        throw std::runtime_error("HotkeyManager is null");
-    }
-    connect(m_hotkeyManager, &HotkeyManager::showTranslateHotkeyPressed,
-            this, &Application::onShowTranslateHotkeyPressed);
-    qDebug() << "Show and Translate hotkey signal connected successfully";
     
     // Network status changes
     qDebug() << "Connecting NetworkMonitor::onlineStatusChanged to Application::onNetworkStatusChanged...";
@@ -222,8 +195,48 @@ void Application::connectSignals() {
     qDebug() << "Application::connectSignals() - EXIT";
 }
 
-void Application::onHotkeyPressed() {
+void Application::registerAllHotkeys() {
+    qDebug() << "Application::registerAllHotkeys() - ENTRY";
+    
+    for (int i = 0; i < HotkeyType::Count; ++i) {
+        HotkeyType::Type type = static_cast<HotkeyType::Type>(i);
+        
+        int key = AppConfig::instance()->getHotkeyKey(type);
+        Qt::KeyboardModifiers modifiers = AppConfig::instance()->getHotkeyModifiers(type);
+        
+        bool registered = m_hotkeyManager->registerHotkey(type, key, modifiers);
+        if (registered) {
+            qDebug() << "Registered hotkey:" << HotkeyType::toDisplayName(type)
+                    << "as:" << QKeySequence(key | modifiers).toString();
+        } else {
+            qWarning() << "Failed to register hotkey:" << HotkeyType::toDisplayName(type);
+        }
+    }
+    
+    qDebug() << "Application::registerAllHotkeys() - EXIT";
+}
+
+void Application::updateAllHotkeys() {
+    qDebug() << "Application::updateAllHotkeys() - ENTRY";
+    
+    for (int i = 0; i < HotkeyType::Count; ++i) {
+        HotkeyType::Type type = static_cast<HotkeyType::Type>(i);
+        
+        int key = AppConfig::instance()->getHotkeyKey(type);
+        Qt::KeyboardModifiers modifiers = AppConfig::instance()->getHotkeyModifiers(type);
+        
+        m_hotkeyManager->updateHotkey(type, key, modifiers);
+        
+        qDebug() << "Updated hotkey:" << HotkeyType::toDisplayName(type)
+                << "to:" << QKeySequence(key | modifiers).toString();
+    }
+    
+    qDebug() << "Application::updateAllHotkeys() - EXIT";
+}
+
+void Application::onHotkeyPressed(int type) {
     qDebug() << "Application::onHotkeyPressed() - ENTRY";
+    qDebug() << "Hotkey type:" << HotkeyType::toDisplayName(static_cast<HotkeyType::Type>(type));
     
     if (!m_mainWindow) {
         qWarning() << "Hotkey pressed but m_mainWindow is null - ignoring";
@@ -231,44 +244,41 @@ void Application::onHotkeyPressed() {
         return;
     }
     
-    // Check if auto-translate on clipboard is enabled
+    HotkeyType::Type hotkeyType = static_cast<HotkeyType::Type>(type);
     bool autoTranslate = AppConfig::instance()->getAutoTranslate();
-    qDebug() << "Auto-translate on clipboard setting:" << (autoTranslate ? "enabled" : "disabled");
     
-    if (m_mainWindow->isVisible()) {
-        qDebug() << "Hotkey pressed - window is visible, hiding window";
-        m_mainWindow->hide();
-    } else {
-        qDebug() << "Hotkey pressed - window is hidden, showing window";
-        m_mainWindow->showAndActivate();
-        
-        // Only insert clipboard text if auto-translate is enabled
-        if (autoTranslate) {
-            qDebug() << "Auto-translate enabled - inserting clipboard text";
+    switch (hotkeyType) {
+        case HotkeyType::MainToggle:
+            // Toggle window visibility, only translate if auto-translate enabled
+            qDebug() << "Main toggle - checking window visibility";
+            if (m_mainWindow->isVisible()) {
+                qDebug() << "Main toggle - hiding window";
+                m_mainWindow->hide();
+            } else {
+                qDebug() << "Main toggle - showing window";
+                m_mainWindow->showAndActivate();
+                if (autoTranslate) {
+                    qDebug() << "Auto-translate enabled - inserting clipboard text";
+                    m_mainWindow->insertClipboardText();
+                } else {
+                    qDebug() << "Auto-translate disabled - not inserting clipboard text";
+                }
+            }
+            break;
+            
+        case HotkeyType::ShowAndTranslate:
+            // Always show window and translate
+            qDebug() << "Show and translate - showing window with translation";
+            m_mainWindow->showAndActivate();
             m_mainWindow->insertClipboardText();
-        } else {
-            qDebug() << "Auto-translate disabled - not inserting clipboard text";
-        }
+            break;
+            
+        default:
+            qWarning() << "Unknown hotkey type:" << type;
+            break;
     }
     
     qDebug() << "Application::onHotkeyPressed() - EXIT";
-}
-
-void Application::onShowTranslateHotkeyPressed() {
-    qDebug() << "Application::onShowTranslateHotkeyPressed() - ENTRY";
-    
-    if (!m_mainWindow) {
-        qWarning() << "Show and Translate hotkey pressed but m_mainWindow is null - ignoring";
-        qDebug() << "Application::onShowTranslateHotkeyPressed() - EXIT";
-        return;
-    }
-    
-    // Show window and insert clipboard text (always, independent of auto-translate setting)
-    qDebug() << "Show and Translate hotkey pressed - showing window and inserting clipboard text";
-    m_mainWindow->showAndActivate();
-    m_mainWindow->insertClipboardText();
-    
-    qDebug() << "Application::onShowTranslateHotkeyPressed() - EXIT";
 }
 
 void Application::onNetworkStatusChanged(bool online) {
@@ -302,26 +312,13 @@ void Application::onSettingsChanged() {
             qWarning() << "Cannot update WebView theme - m_mainWindow is null";
         }
         
-        // Update hotkey if changed
+        // Update all hotkeys
         if (m_hotkeyManager) {
-            qDebug() << "Updating hotkey...";
-            int hotkeyKey = AppConfig::instance()->getHotkeyKey();
-            Qt::KeyboardModifiers hotkeyModifiers = AppConfig::instance()->getHotkeyModifiers();
-            m_hotkeyManager->updateHotkey(hotkeyKey, hotkeyModifiers);
-            qDebug() << "Hotkey updated to:" << QKeySequence(hotkeyKey | hotkeyModifiers).toString();
+            qDebug() << "Updating all hotkeys...";
+            updateAllHotkeys();
+            qDebug() << "All hotkeys updated successfully";
         } else {
-            qWarning() << "Cannot update hotkey - m_hotkeyManager is null";
-        }
-        
-        // Update show and translate hotkey if changed
-        if (m_hotkeyManager) {
-            qDebug() << "Updating show and translate hotkey...";
-            int showTranslateKey = AppConfig::instance()->getShowTranslateKey();
-            Qt::KeyboardModifiers showTranslateModifiers = AppConfig::instance()->getShowTranslateModifiers();
-            m_hotkeyManager->updateShowTranslateHotkey(showTranslateKey, showTranslateModifiers);
-            qDebug() << "Show and Translate hotkey updated to:" << QKeySequence(showTranslateKey | showTranslateModifiers).toString();
-        } else {
-            qWarning() << "Cannot update show and translate hotkey - m_hotkeyManager is null";
+            qWarning() << "Cannot update hotkeys - m_hotkeyManager is null";
         }
         
         // Note: Other settings (window position, opacity, etc.) are applied by MainWindow
