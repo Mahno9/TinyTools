@@ -41,6 +41,7 @@ protected:
   void mouseReleaseEvent(QMouseEvent *event) override;
   void closeEvent(QCloseEvent *event) override;
   void changeEvent(QEvent *event) override;
+  void hideEvent(QHideEvent *event) override;
 #ifdef Q_OS_WIN
   bool nativeEvent(const QByteArray &eventType, void *message,
                    qintptr *result) override;

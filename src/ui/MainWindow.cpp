@@ -510,6 +510,19 @@ void MainWindow::changeEvent(QEvent *event) {
   }
 }
 
+void MainWindow::hideEvent(QHideEvent *event) {
+  // Save window geometry when hiding
+  if (!isMinimized() && !isMaximized()) {
+    AppConfig *config = AppConfig::instance();
+    config->setWindowWidth(width());
+    config->setWindowHeight(height());
+    config->setWindowX(x());
+    config->setWindowY(y());
+    config->save();
+  }
+  QMainWindow::hideEvent(event);
+}
+
 #ifdef Q_OS_WIN
 bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
                              qintptr *result) {
