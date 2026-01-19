@@ -15,9 +15,11 @@
 #include <QPushButton>
 #include <QScreen>
 #include <QSettings>
+#include <QStackedWidget>
 #include <QTabBar>
 #include <QTimer>
 #include <QVBoxLayout>
+
 
 MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
     : QMainWindow(parent), m_clipboardManager(clipboardManager),
@@ -153,8 +155,11 @@ void MainWindow::setupWindowFlags() {
 }
 
 void MainWindow::setupWebView() {
-  m_webView = new WebViewContainer(this);
-  centralWidget()->layout()->addWidget(m_webView);
+  m_stackedWidget = new QStackedWidget(this);
+  centralWidget()->layout()->addWidget(m_stackedWidget);
+
+  // m_webView will track the currently active view
+  m_webView = nullptr;
 
   if (m_clipboardManager) {
     connect(m_clipboardManager, &ClipboardManager::clipboardChanged, this,
@@ -251,22 +256,36 @@ void MainWindow::loadCurrentResource() {
     return;
   }
 
-  WebResource resource =
-      ResourceManager::instance()->getResourceById(m_currentResourceId);
-  if (resource.isValid()) {
-    qDebug() << "Loading resource:" << resource.name;
-    qDebug() << "  ID:" << resource.id;
-    qDebug() << "  URL:" << resource.url;
-
-    if (m_webView) {
-      m_webView->loadResource(resource);
-    } else {
-      qCritical() << "m_webView is NULL!";
-    }
+  // Check if view already exists
+  if (m_resourceViews.contains(m_currentResourceId)) {
+    qDebug() << "Switching to existing view for ID:" << m_currentResourceId;
+    WebViewContainer *view = m_resourceViews[m_currentResourceId];
+    m_stackedWidget->setCurrentWidget(view);
+    m_webView = view;
   } else {
-    qWarning() << "Resource with ID" << m_currentResourceId
-               << "is invalid or not found";
+    // Create new view
+    qDebug() << "Creating new view for ID:" << m_currentResourceId;
+    WebResource resource =
+        ResourceManager::instance()->getResourceById(m_currentResourceId);
+
+    if (resource.isValid()) {
+      WebViewContainer *view = new WebViewContainer(this);
+
+      // Apply current theme immediately
+      bool darkTheme = AppConfig::instance()->getDarkTheme();
+      view->applyWebViewTheme(darkTheme);
+
+      view->loadResource(resource);
+
+      m_stackedWidget->addWidget(view);
+      m_stackedWidget->setCurrentWidget(view);
+      m_resourceViews.insert(m_currentResourceId, view);
+      m_webView = view;
+    } else {
+      qWarning() << "Resource invalid, cannot create view";
+    }
   }
+
   qDebug() << "MainWindow::loadCurrentResource() - EXIT";
 }
 
@@ -323,8 +342,9 @@ void MainWindow::toggleAlwaysOnTop() {
 }
 
 void MainWindow::applyWebViewTheme(bool darkTheme) {
-  if (m_webView) {
-    m_webView->applyWebViewTheme(darkTheme);
+  // Apply to all loaded views
+  for (auto view : m_resourceViews) {
+    view->applyWebViewTheme(darkTheme);
   }
 
   // Apply theme to drag handle and header elements
