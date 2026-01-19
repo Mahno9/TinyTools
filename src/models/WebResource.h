@@ -23,8 +23,9 @@ struct WebResource {
   QString openScript;    // JS executed on normal open
   QString altOpenScript; // JS executed on alternative open
 
-  bool isEnabled = true; // Whether this resource is active
-  int order = 0;         // Display order in tabs (0 = first)
+  bool isEnabled = true;   // Whether this resource is active
+  int order = 0;           // Display order in tabs (0 = first)
+  double zoomFactor = 1.0; // WebView zoom level (1.0 = 100%)
 
   /**
    * @brief Create a new WebResource with a generated UUID
@@ -36,6 +37,7 @@ struct WebResource {
     resource.url = url;
     resource.isEnabled = true;
     resource.order = 0;
+    resource.zoomFactor = 1.0;
     return resource;
   }
 
@@ -53,6 +55,7 @@ struct WebResource {
     obj["altOpenScript"] = altOpenScript;
     obj["isEnabled"] = isEnabled;
     obj["order"] = order;
+    obj["zoomFactor"] = zoomFactor;
     return obj;
   }
 
@@ -70,6 +73,7 @@ struct WebResource {
     resource.altOpenScript = obj["altOpenScript"].toString();
     resource.isEnabled = obj["isEnabled"].toBool(true);
     resource.order = obj["order"].toInt(0);
+    resource.zoomFactor = obj["zoomFactor"].toDouble(1.0);
 
     // Generate ID if missing (for imported resources)
     if (resource.id.isEmpty()) {

@@ -53,6 +53,7 @@ private slots:
   void onMinimizeButtonClicked();
   void onSettingsButtonClicked();
   void onTabChanged(int index);
+  void onZoomChanged(const QString &resourceId, double zoomFactor);
 
 private:
   void setupUI();

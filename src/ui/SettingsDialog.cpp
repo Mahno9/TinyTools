@@ -398,6 +398,19 @@ public:
     urlLayout->addWidget(urlEdit, 1);
     m_contentLayout->addLayout(urlLayout);
 
+    // Zoom Factor
+    QHBoxLayout *zoomLayout = new QHBoxLayout();
+    zoomLayout->addWidget(new QLabel("Zoom Level (%):"));
+    QSpinBox *zoomSpinBox = new QSpinBox();
+    zoomSpinBox->setObjectName("zoomSpinBox");
+    zoomSpinBox->setRange(30, 300);
+    zoomSpinBox->setSingleStep(10);
+    zoomSpinBox->setValue(static_cast<int>(resource.zoomFactor * 100));
+    zoomSpinBox->setSuffix("%");
+    zoomLayout->addWidget(zoomSpinBox);
+    zoomLayout->addStretch();
+    m_contentLayout->addLayout(zoomLayout);
+
     // Init Script
     m_contentLayout->addWidget(
         new QLabel("Initialization Script (Executed once on load):"));
@@ -738,6 +751,7 @@ void SettingsDialog::saveResourceFromPanel(QWidget *widget,
 
   QLineEdit *nameEdit = content->findChild<QLineEdit *>("nameEdit");
   QLineEdit *urlEdit = content->findChild<QLineEdit *>("urlEdit");
+  QSpinBox *zoomSpinBox = content->findChild<QSpinBox *>("zoomSpinBox");
   QPlainTextEdit *initScriptEdit =
       content->findChild<QPlainTextEdit *>("initScriptEdit");
   QPlainTextEdit *openScriptEdit =
@@ -749,6 +763,8 @@ void SettingsDialog::saveResourceFromPanel(QWidget *widget,
     resource.name = nameEdit->text();
   if (urlEdit)
     resource.url = urlEdit->text();
+  if (zoomSpinBox)
+    resource.zoomFactor = zoomSpinBox->value() / 100.0;
   if (initScriptEdit)
     resource.initScript = initScriptEdit->toPlainText();
   if (openScriptEdit)

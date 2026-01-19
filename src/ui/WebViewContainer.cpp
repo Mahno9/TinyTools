@@ -1,4 +1,5 @@
 #include "WebViewContainer.h"
+#include <QChildEvent>
 #include <QContextMenuEvent>
 #include <QDebug>
 #include <QTimer>
@@ -6,6 +7,7 @@
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
+#include <QWheelEvent>
 
 WebViewContainer::WebViewContainer(QWidget *parent)
     : QWebEngineView(parent), m_darkThemeEnabled(false),
@@ -36,6 +38,11 @@ WebViewContainer::WebViewContainer(QWidget *parent)
   // Initial load blank or default?
   // We wait for loadResource to be called.
   // load(QUrl("about:blank"));
+
+  // Install event filter on focus proxy to catch wheel events
+  if (focusProxy()) {
+    focusProxy()->installEventFilter(this);
+  }
 }
 
 void WebViewContainer::loadResource(const WebResource &resource) {
@@ -43,9 +50,14 @@ void WebViewContainer::loadResource(const WebResource &resource) {
   qDebug() << "  Name:" << resource.name;
   qDebug() << "  URL String:" << resource.url;
 
+  m_resourceId = resource.id;
   m_openScript = resource.openScript;
   m_altOpenScript = resource.altOpenScript;
   m_initScript = resource.initScript;
+
+  // Apply zoom factor
+  setZoomFactor(resource.zoomFactor);
+  qDebug() << "  Zoom factor:" << resource.zoomFactor;
 
   QUrl url(resource.url);
   if (!url.isValid()) {
@@ -198,4 +210,35 @@ void WebViewContainer::applyWebViewTheme(bool darkTheme) {
   m_darkThemeEnabled = darkTheme;
   // Removed hardcoded Yandex theme logic.
   // TODO: Allow generic theme scripts?
+}
+
+bool WebViewContainer::eventFilter(QObject *obj, QEvent *event) {
+  if (event->type() == QEvent::Wheel) {
+    QWheelEvent *wheelEvent = static_cast<QWheelEvent *>(event);
+    if (wheelEvent->modifiers() & Qt::ControlModifier) {
+      const double step = 0.1; // 10% per scroll step
+      double currentZoom = zoomFactor();
+
+      if (wheelEvent->angleDelta().y() > 0) {
+        // Scroll up - zoom in
+        currentZoom = qMin(currentZoom + step, 3.0);
+      } else {
+        // Scroll down - zoom out
+        currentZoom = qMax(currentZoom - step, 0.3);
+      }
+
+      setZoomFactor(currentZoom);
+      emit zoomChanged(m_resourceId, currentZoom);
+      return true; // Event handled
+    }
+  }
+  return QWebEngineView::eventFilter(obj, event);
+}
+
+void WebViewContainer::childEvent(QChildEvent *event) {
+  QWebEngineView::childEvent(event);
+  // When child is added (render widget), install event filter
+  if (event->added() && focusProxy()) {
+    focusProxy()->installEventFilter(this);
+  }
 }

@@ -275,6 +275,10 @@ void MainWindow::loadCurrentResource() {
     if (resource.isValid()) {
       WebViewContainer *view = new WebViewContainer(this);
 
+      // Connect zoom signal
+      connect(view, &WebViewContainer::zoomChanged, this,
+              &MainWindow::onZoomChanged);
+
       // Apply current theme immediately
       bool darkTheme = AppConfig::instance()->getDarkTheme();
       view->applyWebViewTheme(darkTheme);
@@ -568,3 +572,18 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
   return QMainWindow::nativeEvent(eventType, message, result);
 }
 #endif
+
+void MainWindow::onZoomChanged(const QString &resourceId, double zoomFactor) {
+  qDebug() << "MainWindow::onZoomChanged -" << resourceId << zoomFactor;
+
+  // Update resource in ResourceManager
+  WebResource resource =
+      ResourceManager::instance()->getResourceById(resourceId);
+  if (resource.isValid()) {
+    resource.zoomFactor = zoomFactor;
+    ResourceManager::instance()->updateResource(resource);
+
+    // Save immediately
+    ResourceManager::instance()->saveToConfig();
+  }
+}
