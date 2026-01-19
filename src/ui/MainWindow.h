@@ -41,6 +41,10 @@ protected:
   void mouseReleaseEvent(QMouseEvent *event) override;
   void closeEvent(QCloseEvent *event) override;
   void changeEvent(QEvent *event) override;
+#ifdef Q_OS_WIN
+  bool nativeEvent(const QByteArray &eventType, void *message,
+                   qintptr *result) override;
+#endif
 
 private slots:
   void setOpacity(int value);
@@ -71,10 +75,13 @@ private:
 
   QPoint m_dragPosition;
   bool m_dragging;
+  bool m_resizing;
+  Qt::Edges m_resizeEdge;
 
   QList<QString> m_tabResourceIds;
   QString m_currentResourceId;
 
   static constexpr int DEFAULT_WIDTH = 800;
   static constexpr int DEFAULT_HEIGHT = 600;
+  static constexpr int RESIZE_MARGIN = 10;
 };

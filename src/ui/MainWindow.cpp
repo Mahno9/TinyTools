@@ -20,10 +20,14 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
+#ifdef Q_OS_WIN
+#include <windows.h>
+#include <windowsx.h>
+#endif
 
 MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
     : QMainWindow(parent), m_clipboardManager(clipboardManager),
-      m_dragging(false) {
+      m_dragging(false), m_resizing(false), m_resizeEdge(Qt::Edges()) {
   qDebug() << "MainWindow::MainWindow() - ENTRY";
 
   try {
@@ -465,22 +469,14 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
 }
 
 void MainWindow::mousePressEvent(QMouseEvent *event) {
-  if (event->button() == Qt::LeftButton && event->pos().y() <= 30) {
-    m_dragging = true;
-    m_dragPosition = event->globalPos() - frameGeometry().topLeft();
-    event->accept();
-  }
+  QMainWindow::mousePressEvent(event);
 }
 
 void MainWindow::mouseMoveEvent(QMouseEvent *event) {
-  if (m_dragging && event->buttons() & Qt::LeftButton) {
-    move(event->globalPos() - m_dragPosition);
-    event->accept();
-  }
+  QMainWindow::mouseMoveEvent(event);
 }
 
 void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
-  m_dragging = false;
   QMainWindow::mouseReleaseEvent(event);
 }
 
@@ -496,3 +492,79 @@ void MainWindow::changeEvent(QEvent *event) {
       hide();
   }
 }
+
+#ifdef Q_OS_WIN
+bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
+                             qintptr *result) {
+  MSG *msg = static_cast<MSG *>(message);
+  if (msg->message == WM_NCHITTEST) {
+    if (isMaximized())
+      return false;
+
+    // Get mouse coordinates (use QCursor::pos() for reliable logical
+    // coordinates)
+    QPoint localPos = mapFromGlobal(QCursor::pos());
+
+    int w = width();
+    int h = height();
+    int margin = RESIZE_MARGIN;
+
+    bool left = localPos.x() < margin;
+    bool right = localPos.x() >= w - margin;
+    bool top = localPos.y() < margin;
+    bool bottom = localPos.y() >= h - margin;
+
+    if (top && left) {
+      *result = HTTOPLEFT;
+      return true;
+    }
+    if (top && right) {
+      *result = HTTOPRIGHT;
+      return true;
+    }
+    if (bottom && left) {
+      *result = HTBOTTOMLEFT;
+      return true;
+    }
+    if (bottom && right) {
+      *result = HTBOTTOMRIGHT;
+      return true;
+    }
+    if (left) {
+      *result = HTLEFT;
+      return true;
+    }
+    if (right) {
+      *result = HTRIGHT;
+      return true;
+    }
+    if (top) {
+      *result = HTTOP;
+      return true;
+    }
+    if (bottom) {
+      *result = HTBOTTOM;
+      return true;
+    }
+
+    // Title bar (HTCAPTION)
+    if (localPos.y() <= 30) {
+      // Check if hovering over buttons/tabs to avoid stealing clicks
+      QWidget *child = childAt(localPos);
+      // If it's a button or tab bar, let Qt handle valid clicks (HTCLIENT)
+      // But verify hierarchy. childAt finds deepest widget.
+      if (qobject_cast<QPushButton *>(child) ||
+          qobject_cast<QTabBar *>(child)) {
+        return false;
+      }
+      // Also dragging handle is a widget itself?
+      // If child is m_dragHandle (container), then it IS the background we want
+      // to drag.
+
+      *result = HTCAPTION;
+      return true;
+    }
+  }
+  return QMainWindow::nativeEvent(eventType, message, result);
+}
+#endif
