@@ -147,11 +147,11 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
   QVBoxLayout *layout = new QVBoxLayout(tab);
 
   // === Main Toggle Hotkey Group ===
-  QGroupBox *mainHotkeyGroup = new QGroupBox("Main Toggle Hotkey", tab);
+  QGroupBox *mainHotkeyGroup = new QGroupBox("Main Open Hotkey", tab);
   QFormLayout *mainHotkeyLayout = new QFormLayout(mainHotkeyGroup);
 
   mainHotkeyLayout->addRow(
-      new QLabel("Toggle window visibility (no script execution)", this));
+      new QLabel("Open window and execute Main Script", this));
 
   m_hotkeyKeyLineEdit = new QLineEdit(this);
   m_hotkeyKeyLineEdit->setToolTip(
@@ -174,11 +174,11 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
   layout->addWidget(mainHotkeyGroup);
 
   // === Alternative Toggle Hotkey Group ===
-  QGroupBox *altHotkeyGroup = new QGroupBox("Alternative Toggle Hotkey", tab);
+  QGroupBox *altHotkeyGroup = new QGroupBox("Alternative Open Hotkey", tab);
   QFormLayout *altHotkeyLayout = new QFormLayout(altHotkeyGroup);
 
   altHotkeyLayout->addRow(
-      new QLabel("Show window and execute resource script", this));
+      new QLabel("Open window and execute Alternative Script", this));
 
   m_altToggleKeyLineEdit = new QLineEdit(this);
   m_altToggleKeyLineEdit->setToolTip(
@@ -241,10 +241,7 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
   m_darkThemeCheckBox->setToolTip("Enable dark theme");
   generalLayout->addRow("Dark Theme:", m_darkThemeCheckBox);
 
-  m_autoTranslateCheckBox = new QCheckBox(this);
-  m_autoTranslateCheckBox->setToolTip(
-      "Execute script when Main Toggle shows window");
-  generalLayout->addRow("Auto-execute Script:", m_autoTranslateCheckBox);
+  // m_autoTranslateCheckBox removed as execution is now mandatory
 
   layout->addWidget(generalGroup);
   layout->addStretch();
@@ -401,54 +398,7 @@ public:
     urlLayout->addWidget(urlEdit, 1);
     m_contentLayout->addLayout(urlLayout);
 
-    // Open Script
     m_contentLayout->addWidget(new QLabel("Open Script (JavaScript):"));
-
-    // Open Hotkey
-    QHBoxLayout *openHotkeyLayout = new QHBoxLayout();
-    openHotkeyLayout->addWidget(new QLabel("Open Hotkey:"));
-
-    QLineEdit *openKeyEdit =
-        new QLineEdit(QString::number(resource.openHotkeyKey));
-    openKeyEdit->setObjectName("openKeyEdit");
-    openKeyEdit->setPlaceholderText("Key Code");
-    openKeyEdit->setFixedWidth(60);
-    openHotkeyLayout->addWidget(openKeyEdit);
-
-    QCheckBox *openCtrlCheck = new QCheckBox("Ctrl");
-    openCtrlCheck->setObjectName("openCtrlCheck");
-    // Remove border:none to inherit global style (which has color), or set
-    // color explicitly if needed.
-    // openCtrlCheck->setStyleSheet("QCheckBox { border: none; }");
-    if (darkTheme)
-      openCtrlCheck->setStyleSheet("QCheckBox { color: #ccc; }");
-    else
-      openCtrlCheck->setStyleSheet("QCheckBox { color: #333; }");
-    openCtrlCheck->setChecked(resource.openHotkeyModifiers &
-                              Qt::ControlModifier);
-    openHotkeyLayout->addWidget(openCtrlCheck);
-
-    QCheckBox *openAltCheck = new QCheckBox("Alt");
-    openAltCheck->setObjectName("openAltCheck");
-    if (darkTheme)
-      openAltCheck->setStyleSheet("QCheckBox { color: #ccc; }");
-    else
-      openAltCheck->setStyleSheet("QCheckBox { color: #333; }");
-    openAltCheck->setChecked(resource.openHotkeyModifiers & Qt::AltModifier);
-    openHotkeyLayout->addWidget(openAltCheck);
-
-    QCheckBox *openShiftCheck = new QCheckBox("Shift");
-    openShiftCheck->setObjectName("openShiftCheck");
-    if (darkTheme)
-      openShiftCheck->setStyleSheet("QCheckBox { color: #ccc; }");
-    else
-      openShiftCheck->setStyleSheet("QCheckBox { color: #333; }");
-    openShiftCheck->setChecked(resource.openHotkeyModifiers &
-                               Qt::ShiftModifier);
-    openHotkeyLayout->addWidget(openShiftCheck);
-
-    openHotkeyLayout->addStretch();
-    m_contentLayout->addLayout(openHotkeyLayout);
 
     QPlainTextEdit *openScriptEdit = new QPlainTextEdit();
     openScriptEdit->setObjectName("openScriptEdit");
@@ -460,49 +410,6 @@ public:
     // Alt Open Script
     m_contentLayout->addWidget(
         new QLabel("Alternative Open Script (JavaScript):"));
-
-    // Alt Open Hotkey
-    QHBoxLayout *altHotkeyLayout = new QHBoxLayout();
-    altHotkeyLayout->addWidget(new QLabel("Alt Open Hotkey:"));
-
-    QLineEdit *altKeyEdit =
-        new QLineEdit(QString::number(resource.altOpenHotkeyKey));
-    altKeyEdit->setObjectName("altKeyEdit");
-    altKeyEdit->setPlaceholderText("Key Code");
-    altKeyEdit->setFixedWidth(60);
-    altHotkeyLayout->addWidget(altKeyEdit);
-
-    QCheckBox *altCtrlCheck = new QCheckBox("Ctrl");
-    altCtrlCheck->setObjectName("altCtrlCheck");
-    if (darkTheme)
-      altCtrlCheck->setStyleSheet("QCheckBox { color: #ccc; }");
-    else
-      altCtrlCheck->setStyleSheet("QCheckBox { color: #333; }");
-    altCtrlCheck->setChecked(resource.altOpenHotkeyModifiers &
-                             Qt::ControlModifier);
-    altHotkeyLayout->addWidget(altCtrlCheck);
-
-    QCheckBox *altAltCheck = new QCheckBox("Alt");
-    altAltCheck->setObjectName("altAltCheck");
-    if (darkTheme)
-      altAltCheck->setStyleSheet("QCheckBox { color: #ccc; }");
-    else
-      altAltCheck->setStyleSheet("QCheckBox { color: #333; }");
-    altAltCheck->setChecked(resource.altOpenHotkeyModifiers & Qt::AltModifier);
-    altHotkeyLayout->addWidget(altAltCheck);
-
-    QCheckBox *altShiftCheck = new QCheckBox("Shift");
-    altShiftCheck->setObjectName("altShiftCheck");
-    if (darkTheme)
-      altShiftCheck->setStyleSheet("QCheckBox { color: #ccc; }");
-    else
-      altShiftCheck->setStyleSheet("QCheckBox { color: #333; }");
-    altShiftCheck->setChecked(resource.altOpenHotkeyModifiers &
-                              Qt::ShiftModifier);
-    altHotkeyLayout->addWidget(altShiftCheck);
-
-    altHotkeyLayout->addStretch();
-    m_contentLayout->addLayout(altHotkeyLayout);
 
     QPlainTextEdit *altScriptEdit = new QPlainTextEdit();
     altScriptEdit->setObjectName("altScriptEdit");
@@ -653,7 +560,8 @@ void SettingsDialog::loadSettings() {
   m_autoStartOnLoginCheckBox->setChecked(config->getAutoStartOnLogin());
   m_minimizeToTrayCheckBox->setChecked(config->getMinimizeToTray());
   m_darkThemeCheckBox->setChecked(config->getDarkTheme());
-  m_autoTranslateCheckBox->setChecked(config->getAutoTranslate());
+  m_darkThemeCheckBox->setChecked(config->getDarkTheme());
+  // m_autoTranslateCheckBox->setChecked(config->getAutoTranslate());
 
   // Load Resources tab
   ResourceManager::instance()->loadFromConfig();
@@ -757,7 +665,8 @@ void SettingsDialog::saveSettings() {
   config->setAutoStartOnLogin(m_autoStartOnLoginCheckBox->isChecked());
   config->setMinimizeToTray(m_minimizeToTrayCheckBox->isChecked());
   config->setDarkTheme(m_darkThemeCheckBox->isChecked());
-  config->setAutoTranslate(m_autoTranslateCheckBox->isChecked());
+  config->setDarkTheme(m_darkThemeCheckBox->isChecked());
+  // config->setAutoTranslate(m_autoTranslateCheckBox->isChecked());
 
   // Save resource panels
   qDebug() << "Saving" << m_resourcePanels.size() << "resource panels...";
@@ -821,17 +730,6 @@ void SettingsDialog::saveResourceFromPanel(QWidget *widget,
   QPlainTextEdit *altScriptEdit =
       content->findChild<QPlainTextEdit *>("altScriptEdit");
 
-  // Hotkey fields
-  QLineEdit *openKeyEdit = content->findChild<QLineEdit *>("openKeyEdit");
-  QCheckBox *openCtrlCheck = content->findChild<QCheckBox *>("openCtrlCheck");
-  QCheckBox *openAltCheck = content->findChild<QCheckBox *>("openAltCheck");
-  QCheckBox *openShiftCheck = content->findChild<QCheckBox *>("openShiftCheck");
-
-  QLineEdit *altKeyEdit = content->findChild<QLineEdit *>("altKeyEdit");
-  QCheckBox *altCtrlCheck = content->findChild<QCheckBox *>("altCtrlCheck");
-  QCheckBox *altAltCheck = content->findChild<QCheckBox *>("altAltCheck");
-  QCheckBox *altShiftCheck = content->findChild<QCheckBox *>("altShiftCheck");
-
   if (nameEdit)
     resource.name = nameEdit->text();
   if (urlEdit)
@@ -840,30 +738,6 @@ void SettingsDialog::saveResourceFromPanel(QWidget *widget,
     resource.openScript = openScriptEdit->toPlainText();
   if (altScriptEdit)
     resource.altOpenScript = altScriptEdit->toPlainText();
-
-  // Save Open Hotkey
-  if (openKeyEdit) {
-    resource.openHotkeyKey = stringToKeyCode(openKeyEdit->text());
-    resource.openHotkeyModifiers = Qt::NoModifier;
-    if (openCtrlCheck && openCtrlCheck->isChecked())
-      resource.openHotkeyModifiers |= Qt::ControlModifier;
-    if (openAltCheck && openAltCheck->isChecked())
-      resource.openHotkeyModifiers |= Qt::AltModifier;
-    if (openShiftCheck && openShiftCheck->isChecked())
-      resource.openHotkeyModifiers |= Qt::ShiftModifier;
-  }
-
-  // Save Alt Open Hotkey
-  if (altKeyEdit) {
-    resource.altOpenHotkeyKey = stringToKeyCode(altKeyEdit->text());
-    resource.altOpenHotkeyModifiers = Qt::NoModifier;
-    if (altCtrlCheck && altCtrlCheck->isChecked())
-      resource.altOpenHotkeyModifiers |= Qt::ControlModifier;
-    if (altAltCheck && altAltCheck->isChecked())
-      resource.altOpenHotkeyModifiers |= Qt::AltModifier;
-    if (altShiftCheck && altShiftCheck->isChecked())
-      resource.altOpenHotkeyModifiers |= Qt::ShiftModifier;
-  }
 
   ResourceManager::instance()->updateResource(resource);
 }
@@ -894,7 +768,8 @@ void SettingsDialog::onResetClicked() {
   m_autoStartOnLoginCheckBox->setChecked(false);
   m_minimizeToTrayCheckBox->setChecked(true);
   m_darkThemeCheckBox->setChecked(false);
-  m_autoTranslateCheckBox->setChecked(false);
+  m_darkThemeCheckBox->setChecked(false);
+  // m_autoTranslateCheckBox->setChecked(false);
 
   // Reset Resources tab
   m_startupLastUsedRadio->setChecked(true);
