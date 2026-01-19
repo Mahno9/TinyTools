@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(YandexTranslator VERSION 1.0.0 LANGUAGES CXX)
+project(TinyTools VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -30,6 +30,7 @@ set(SOURCES
     src/ui/WebViewContainer.cpp
     src/tray/TrayIcon.cpp
     src/models/AppConfig.cpp
+    src/models/ResourceManager.cpp
     src/resources/icons/resources.qrc
 )
 
@@ -44,11 +45,13 @@ set(HEADERS
     src/ui/WebViewContainer.h
     src/tray/TrayIcon.h
     src/models/AppConfig.h
+    src/models/WebResource.h
+    src/models/ResourceManager.h
 )
 
-add_executable(YandexTranslator WIN32 ${SOURCES} ${HEADERS})
+add_executable(TinyTools WIN32 ${SOURCES} ${HEADERS})
 
-target_link_libraries(YandexTranslator PRIVATE
+target_link_libraries(TinyTools PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Widgets
@@ -59,14 +62,15 @@ target_link_libraries(YandexTranslator PRIVATE
 
 # Windows-specific settings
 if(WIN32)
-    set_target_properties(YandexTranslator PROPERTIES
+    set_target_properties(TinyTools PROPERTIES
         WIN32_EXECUTABLE TRUE
-        OUTPUT_NAME "YandexTranslator"
+        OUTPUT_NAME "TinyTools"
     )
     
     # Set application icon
     set(APP_ICON_RESOURCE "${CMAKE_SOURCE_DIR}/src/resources/icons/app.rc")
     if(EXISTS ${APP_ICON_RESOURCE})
-        target_sources(YandexTranslator PRIVATE ${APP_ICON_RESOURCE})
+        target_sources(TinyTools PRIVATE ${APP_ICON_RESOURCE})
     endif()
 endif()
+

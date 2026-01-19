@@ -36,14 +36,14 @@ void customMessageHandler(QtMsgType type, const QMessageLogContext& context, con
 
 int main(int argc, char* argv[]) {
     // Initialize logging BEFORE QApplication
-    QString logPath = QDir::currentPath() + "/qt_log.txt";
+    QString logPath = QDir::currentPath() + "/tinytools_log.txt";
     
     logFile = new QFile(logPath);
     if (logFile->open(QIODevice::WriteOnly | QIODevice::Append)) {
         logStream = new QTextStream(logFile);
         qInstallMessageHandler(customMessageHandler);
         
-        qDebug() << "=== Yandex Translator Application Startup ===";
+        qDebug() << "=== TinyTools Application Startup ===";
         qDebug() << "Log file:" << logFile->fileName();
     }
     

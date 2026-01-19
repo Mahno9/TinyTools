@@ -8,6 +8,7 @@ class QSystemTrayIcon;
 class QPushButton;
 class QMouseEvent;
 class QCloseEvent;
+class QTabBar;
 class QEvent;
 
 class MainWindow : public QMainWindow {
@@ -18,16 +19,20 @@ public:
     ~MainWindow();
     
     void showAndActivate();
-    void insertClipboardText();
+    void insertClipboardText(bool useAltScript = false);
     void setOnlineStatus(bool online);
     void toggleAlwaysOnTop();
     void applyWebViewTheme(bool darkTheme);
+    void switchToResource(int index);
+    void switchToResourceById(const QString& id);
     
 public slots:
     void onSettingsRequested();
     void applyStartupTheme();
+    void refreshResources();
     
 protected:
+    void keyPressEvent(QKeyEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -40,12 +45,14 @@ private slots:
    void onCloseButtonClicked();
    void onMinimizeButtonClicked();
    void onSettingsButtonClicked();
+   void onTabChanged(int index);
    
 private:
     void setupUI();
     void setupWindowFlags();
     void setupWebView();
     void applySettings();
+    void loadCurrentResource();
     
     QPointer<WebViewContainer> m_webView;
     QPointer<ClipboardManager> m_clipboardManager;
@@ -54,8 +61,13 @@ private:
     QPushButton* m_settingsButton;
     QPushButton* m_closeButton;
     QPushButton* m_minimizeButton;
+    QTabBar* m_tabBar;
+    
     QPoint m_dragPosition;
     bool m_dragging;
+    
+    QList<QString> m_tabResourceIds;
+    QString m_currentResourceId;
     
     static constexpr int DEFAULT_WIDTH = 800;
     static constexpr int DEFAULT_HEIGHT = 600;

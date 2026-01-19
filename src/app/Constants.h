@@ -5,12 +5,12 @@
 namespace Constants {
 
     // Application Info
-    constexpr const char* APP_NAME = "Yandex Translator";
+    constexpr const char* APP_NAME = "TinyTools";
     constexpr const char* APP_VERSION = "1.0.0";
-    constexpr const char* ORGANIZATION_NAME = "YandexTranslator";
+    constexpr const char* ORGANIZATION_NAME = "TinyTools";
 
-    // URLs
-    constexpr const char* TRANSLATOR_URL = "https://translate.yandex.ru/";
+    // Resource Settings
+    constexpr int MAX_RESOURCES = 10;
 
     // Default Window Settings
     constexpr int DEFAULT_WINDOW_WIDTH = 800;
@@ -54,7 +54,7 @@ namespace Constants {
     // Error Messages
     constexpr const char* ERROR_CLIPBOARD_EMPTY = "Clipboard is empty or contains no valid text";
     constexpr const char* ERROR_NETWORK_OFFLINE = "Network connection is offline";
-    constexpr const char* ERROR_WEBVIEW_LOAD_FAILED = "Failed to load translator page";
+    constexpr const char* ERROR_WEBVIEW_LOAD_FAILED = "Failed to load resource page";
     constexpr const char* ERROR_CONFIG_LOAD_FAILED = "Failed to load configuration file";
     constexpr const char* ERROR_HOTKEY_REGISTER_FAILED = "Failed to register hotkey";
 
@@ -67,3 +67,4 @@ namespace Constants {
     constexpr const char* LOG_CATEGORY_CONFIG = "config";
 
 } // namespace Constants
+

@@ -158,7 +158,7 @@ void AppConfig::resetToDefaults() {
                 defaultKey = Qt::Key_T;
                 defaultModifiers = Qt::ControlModifier | Qt::AltModifier;
                 break;
-            case HotkeyType::ShowAndTranslate:
+            case HotkeyType::AlternativeToggle:
                 defaultKey = Qt::Key_S;
                 defaultModifiers = Qt::ControlModifier | Qt::AltModifier;
                 break;
@@ -199,8 +199,8 @@ QString AppConfig::getHotkeyConfigKey(HotkeyType::Type type) const {
     switch (type) {
         case HotkeyType::MainToggle:
             return "hotkey";
-        case HotkeyType::ShowAndTranslate:
-            return "showTranslateHotkey";
+        case HotkeyType::AlternativeToggle:
+            return "alternativeToggleHotkey";
         default:
             return "unknown";
     }
@@ -326,7 +326,7 @@ void AppConfig::setAutoStartOnLogin(bool value) {
     // Update Windows registry autostart
     HKEY hKey;
     const wchar_t* regPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    const wchar_t* appName = L"YandexTranslator";
+    const wchar_t* appName = L"TinyTools";
     
     if (value) {
         // Add to autostart
@@ -359,7 +359,7 @@ bool AppConfig::isAutoStartEnabledInRegistry() const {
 #ifdef _WIN32
     HKEY hKey;
     const wchar_t* regPath = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    const wchar_t* appName = L"YandexTranslator";
+    const wchar_t* appName = L"TinyTools";
     
     if (RegOpenKeyExW(HKEY_CURRENT_USER, regPath, 0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS) {
         wchar_t value[MAX_PATH];
@@ -410,3 +410,12 @@ QString AppConfig::getConfigFilePath() const {
     QString configDir = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     return configDir + "/settings.json";
 }
+
+QJsonObject AppConfig::getConfigObject() const {
+    return m_config;
+}
+
+void AppConfig::setConfigObject(const QJsonObject& config) {
+    m_config = config;
+}
+

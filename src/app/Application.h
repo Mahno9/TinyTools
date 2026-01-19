@@ -20,14 +20,23 @@ public:
     
 private slots:
     void onHotkeyPressed(int type);
+    void onResourceHotkeyPressed(const QString& resourceId, bool isAlt);
     void onNetworkStatusChanged(bool online);
     void onSettingsChanged();
+    
+    // Resource change handlers
+    void onResourceAdded(const QString& resourceId);
+    void onResourceRemoved(const QString& resourceId);
+    void onResourceUpdated(const QString& resourceId);
     
 private:
     void setupComponents();
     void connectSignals();
     void registerAllHotkeys();
     void updateAllHotkeys();
+    
+    void refreshResourceHotkeys(const QString& resourceId);
+    void registerResourceHotkeys(); // Register all resources
     
     QPointer<MainWindow> m_mainWindow;
     QPointer<TrayIcon> m_trayIcon;

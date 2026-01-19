@@ -1,6 +1,6 @@
-# Yandex Translator Desktop App
+# TinyTools
 
-A lightweight, high-performance desktop application for Windows (10/11) that provides quick access to Yandex Translate via a floating overlay window.
+A versatile, lightweight desktop utility for Windows (10/11) that provides quick access to web resources (translators, AI tools, documentation) via a floating overlay window using global hotkeys.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)
@@ -11,12 +11,17 @@ A lightweight, high-performance desktop application for Windows (10/11) that pro
 ✨ **Lightweight & Fast**
 - Minimal memory footprint (~30-50MB RAM)
 - Sub-2 second startup time
-- Efficient Qt WebEngine integration
+- Efficient Qt WebEngine integration (Chromium-based)
 
-🎯 **Global Hotkey**
-- Customizable global hotkey (default: Ctrl+Alt+T)
-- Quick toggle of translator window
-- Automatic clipboard text insertion
+🔗 **Multi-Resource Support**
+- Add unlimited web resources (e.g., Google Translate, DeepL, ChatGPT, Stack Overflow)
+- Switch between resources instantly using Tabs or Hotkeys (`Alt+1`, `Alt+2`, etc.)
+- Configure custom JavaScript to execute on load for each resource
+
+🎯 **Global Hotkeys**
+- **Main Toggle**: Toggle window visibility (Default: `Alt+Shift+T`)
+- **Alternative Toggle**: Open window and execute a secondary script (e.g., auto-translate clipboard) (Default: `Ctrl+Alt+Shift+T`)
+- **Resource-Specific Hotkeys**: Map unique hotkeys to open specific tools instantly (e.g., `Alt+G` for Google, `Alt+D` for DeepL)
 
 🪟 **Floating Overlay**
 - Always-on-top mode toggle
@@ -24,21 +29,14 @@ A lightweight, high-performance desktop application for Windows (10/11) that pro
 - Drag-to-move functionality
 - Frameless, minimalist design
 
-📋 **Smart Clipboard**
-- Automatic text detection
-- Direct insertion into translator
-- Text length validation
+📋 **Smart Clipboard Integration**
+- Auto-insert clipboard text into the active resource
+- Customizable text injection scripts (JavaScript) per resource
 
 ⚙️ **System Integration**
 - Minimize to system tray
 - Auto-start on Windows login
-- Context menu for quick access
-- Network status monitoring
-
-🛡️ **Robust Error Handling**
-- Offline mode support
-- Graceful degradation on network failures
-- Automatic retry on load errors
+- JSON-based preset import/export for easy sharing of configurations
 
 ## Screenshots
 
@@ -48,165 +46,72 @@ A lightweight, high-performance desktop application for Windows (10/11) that pro
 
 - **OS**: Windows 10 or 11 (64-bit)
 - **RAM**: 512MB minimum, 2GB recommended
-- **Disk**: 50MB free space
-- **Network**: Internet connection for translation
-
-## Installation
-
-### From Release
-
-1. Download the latest release from [Releases](https://github.com/yourusername/YandexTranslator/releases)
-2. Extract the ZIP file
-3. Run `YandexTranslator.exe`
-4. The application will start minimized to tray
-
-### Building from Source
-
-See [BUILD.md](BUILD.md) for detailed build instructions.
+- **Disk**: 50MB free space (+ Qt dependencies)
+- **Network**: Internet connection for web resources
 
 ## Usage
 
 ### Quick Start
 
-1. **Launch the application** - It will start in the system tray
-2. **Press Ctrl+Alt+T** (or your custom hotkey) to show the translator
-3. **Copy text** to your clipboard before activating the hotkey
-4. The text will be **automatically inserted** into the translator
-5. **Press the hotkey again** to hide the window
+1. **Launch the application** - It will start in the system tray.
+2. **Press Alt+Shift+T** to show the overlay window.
+3. **Add Resources**:
+    - Click the "Gear" icon ⚙️ to open Settings.
+    - Go to the "Resources" tab.
+    - Click "Add Resource".
+    - Enter a Name (e.g., "Google Translate") and URL (e.g., `https://translate.google.com`).
+    - (Optional) Configure "Open Script" to auto-paste text: `document.querySelector('textarea').value = '%1';`
+    - Click "Apply".
+4. **Use Tabs**: Switch between tools using the tabs at the top or `Alt+1`, `Alt+2`.
 
-### Tray Icon Menu
-
-Right-click the tray icon to access:
-
-- **Show/Hide Window** - Toggle window visibility
-- **Toggle Always on Top** - Keep window above other apps
-- **Settings...** - Configure hotkey, transparency, etc.
-- **Reload Translator** - Reload the translator page
-- **Exit** - Close the application
-
-### Settings
-
-Configure the following options:
-
-| Setting | Description | Default |
-|----------|-------------|---------|
-| Hotkey | Global hotkey to toggle window | Ctrl+Alt+T |
-| Always on Top | Keep window above other windows | Enabled |
-| Opacity | Window transparency (20-100%) | 90% |
-| Auto Start | Launch on Windows login | Enabled |
-| Minimize to Tray | Hide to system tray instead of taskbar | Enabled |
-
-### Keyboard Shortcuts
+### Hotkeys
 
 | Shortcut | Action |
 |----------|--------|
-| Ctrl+Alt+T | Toggle translator window (default) |
-| Ctrl+Shift+T | Show translator without clipboard insertion |
+| `Alt+Shift+T` | Toggle Main Window (showing last used tab) |
+| `Ctrl+Alt+Shift+T` | Alternative Toggle (executes alternate JS logic) |
+| `Alt+[1-9]` | Switch to Resource Tab 1-9 (when window is active) |
+| [Custom] | Resource-specific toggle (configured in Settings) |
 
 ## Configuration
 
-Configuration is stored in:
+Configuration is stored in `%APPDATA%\TinyTools\settings.json`.
 
-```
-%APPDATA%\YandexTranslator\settings.json
-```
-
-Example configuration:
+### Example Resource Config (JSON)
 
 ```json
 {
-  "hotkey": {
-    "key": 84,
-    "modifiers": [67108864, 134217728]
-  },
-  "window": {
-    "alwaysOnTop": true,
-    "opacity": 90,
-    "x": 100,
-    "y": 100,
-    "width": 800,
-    "height": 600
-  },
-  "general": {
-    "autoStart": true,
-    "minimizeToTray": true,
-    "language": "en"
-  }
+  "resources": [
+    {
+      "id": "uuid-string",
+      "name": "Yandex.Translate",
+      "url": "https://translate.yandex.ru/",
+      "openScript": "const input = document.querySelector('#fakeArea'); if(input) { input.value = '%1'; input.dispatchEvent(new Event('input', { bubbles: true })); }",
+      "openHotkey": { "key": 89, "modifiers": 134217728 } // Alt+Y
+    }
+  ]
 }
 ```
-
-## Troubleshooting
-
-### Hotkey Not Working
-
-1. Check if another application is using the same hotkey
-2. Try a different hotkey combination in Settings
-3. Restart the application
-
-### Translator Not Loading
-
-1. Check your internet connection
-2. Click the "Retry" button in the error page
-3. Try "Reload Translator" from the tray menu
-4. Check if translate.yandex.ru is accessible in your browser
-
-### Clipboard Text Not Inserting
-
-1. Ensure you have copied text to the clipboard
-2. Wait for the page to fully load before activating
-3. Check if the text contains only valid characters
-4. Try manually pasting (Ctrl+V) to verify clipboard content
-
-### High Memory Usage
-
-1. Restart the application periodically
-2. Disable unnecessary browser extensions in WebView
-3. Check for memory leaks and report issues
 
 ## Development
 
 ### Project Structure
 
 ```
-YandexTranslator/
+TinyTools/
 ├── src/              # Source code
-│   ├── app/         # Application core
-│   ├── core/        # Core functionality (clipboard, hotkeys, network)
-│   ├── ui/          # User interface
-│   ├── tray/        # System tray integration
-│   ├── models/       # Data models and config
-│   └── resources/   # Icons and styles
-├── tests/           # Unit and integration tests
+│   ├── app/         # Application core (startup, lifecycle)
+│   ├── core/        # Core managers (Clipboard, Hotkey, Network)
+│   ├── ui/          # UI components (MainWindow, SettingsDialog, WebView)
+│   ├── models/      # Data models (WebResource, ResourceManager)
+│   └── tray/        # System tray integration
+├── tests/           # Unit tests
 └── build/           # Build output
 ```
 
-### Tech Stack
+### Build Instructions
 
-- **Language**: C++17/20
-- **Framework**: Qt 6.x
-- **WebView**: Qt WebEngine (Chromium-based)
-- **Build System**: CMake 3.16+
-- **Platform**: Windows 10/11
-
-### Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.
-
-## Roadmap
-
-- [ ] Translation history
-- [ ] Multiple translation services support
-- [ ] OCR (image-to-text) integration
-- [ ] Voice input support
-- [ ] Offline mode with cached translations
-- [ ] Plugin system for extensions
-- [ ] Linux and macOS support
+See [BUILD.md](plans/BUILD.md) for detailed build instructions using CMake and Qt 6.
 
 ## License
 
@@ -214,20 +119,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- [Qt Framework](https://www.qt.io/) for excellent cross-platform UI framework
-- [Yandex Translate](https://translate.yandex.ru/) for providing the translation service
-- Community contributors and testers
-
-## Support
-
-- **Issues**: [GitHub Issues](https://github.com/yourusername/YandexTranslator/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/yourusername/YandexTranslator/discussions)
-- **Email**: support@example.com
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history and updates.
-
----
-
-Made with ❤️ using Qt and C++
+- **Qt Framework** for the robust cross-platform UI engine.
+- **Yandex, Google, DeepL** and others for the web services we love to use.

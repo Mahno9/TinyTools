@@ -1,6 +1,7 @@
 #pragma once
 #include <QWebEngineView>
 #include <QWebEnginePage>
+#include "../models/WebResource.h"
 
 class WebViewContainer : public QWebEngineView {
     Q_OBJECT
@@ -9,6 +10,7 @@ public:
     explicit WebViewContainer(QWidget* parent = nullptr);
     
     void insertText(const QString& text);
+    void insertAltText(const QString& text);
     void reloadTranslator();
     bool isLoading() const;
     void applyWebViewTheme(bool darkTheme);
@@ -26,14 +28,21 @@ private slots:
     void onRenderProcessTerminated(QWebEnginePage::RenderProcessTerminationStatus status, 
                                    int exitCode);
     
+public:
+    void loadResource(const WebResource& resource);
+    void executeScript(const QString& script);
+    
+private:
+    
 private:
     void injectJavaScript(const QString& script);
     void waitForPageLoad();
-    void findAndInsertInInputField(const QString& text);
     
-    static const char* TRANSLATOR_URL;
-    static const char* INPUT_SELECTOR;
+    // Removed hardcoded TRANSLATOR_URL and INPUT_SELECTOR
     
     bool m_darkThemeEnabled;
     bool m_darkThemeApplied;
+    
+    QString m_openScript;
+    QString m_altOpenScript;
 };

@@ -18,7 +18,7 @@ HotkeyManager::HotkeyManager(QObject* parent)
     
     // Initialize hotkeys map with default values
     m_hotkeys[HotkeyType::MainToggle] = {0, 0, Qt::NoModifier, false, nullptr};
-    m_hotkeys[HotkeyType::ShowAndTranslate] = {0, 0, Qt::NoModifier, false, nullptr};
+    m_hotkeys[HotkeyType::AlternativeToggle] = {0, 0, Qt::NoModifier, false, nullptr};
     qDebug() << "Hotkey data initialized for all hotkey types";
     qDebug() << "Hotkey enabled:" << (m_enabled ? "yes" : "no");
     
@@ -345,6 +345,16 @@ void HotkeyManager::unregisterAll() {
         }
     }
     
+    // Clear resource hotkeys
+    for (auto it = m_resourceHotkeys.begin(); it != m_resourceHotkeys.end(); ++it) {
+        if (it.value().registered) {
+#ifdef _WIN32
+            UnregisterHotKey(static_cast<HWND>(it.value().windowHandle), it.value().id);
+#endif
+        }
+    }
+    m_resourceHotkeys.clear();
+    
     qDebug() << "All hotkeys unregistered";
     qDebug() << "HotkeyManager::unregisterAll() - EXIT";
 }
@@ -400,6 +410,87 @@ void HotkeyManager::setEnabled(bool enabled) {
     qDebug() << "HotkeyManager::setEnabled() - EXIT";
 }
 
+
+bool HotkeyManager::registerResourceHotkey(const QString& resourceId, bool isAlt, int key, Qt::KeyboardModifiers modifiers) {
+    qDebug() << "HotkeyManager::registerResourceHotkey() - ENTRY";
+    qDebug() << "Resource ID:" << resourceId;
+    qDebug() << "Is Alt:" << (isAlt ? "YES" : "NO");
+    qDebug() << "Key:" << key << "Modifiers:" << static_cast<int>(modifiers);
+    
+    // Create new hotkey data
+    ResourceHotkeyData hotkey;
+    hotkey.resourceId = resourceId;
+    hotkey.isAlt = isAlt;
+    hotkey.key = key;
+    hotkey.modifiers = modifiers;
+    hotkey.registered = false;
+    hotkey.windowHandle = nullptr;
+    
+#ifdef _WIN32
+    hotkey.windowHandle = getMainWindowHandle();
+    hotkey.id = ++s_hotkeyIdCounter;
+    
+    UINT vkCode = static_cast<UINT>(key);
+    UINT modifiersCode = 0;
+    
+    if (modifiers & Qt::ControlModifier) modifiersCode |= MOD_CONTROL;
+    if (modifiers & Qt::AltModifier) modifiersCode |= MOD_ALT;
+    if (modifiers & Qt::ShiftModifier) modifiersCode |= MOD_SHIFT;
+    if (modifiers & Qt::MetaModifier) modifiersCode |= MOD_WIN;
+    
+    HWND hwnd = static_cast<HWND>(hotkey.windowHandle);
+    BOOL result = RegisterHotKey(hwnd, hotkey.id, modifiersCode, vkCode);
+    
+    if (result) {
+        hotkey.registered = true;
+        m_resourceHotkeys.insert(hotkey.id, hotkey);
+        qDebug() << "Resource hotkey registered with ID:" << hotkey.id;
+        return true;
+    } else {
+        qWarning() << "Failed to register resource hotkey. Error:" << GetLastError();
+        
+        // Try workaround for Win key
+        if ((modifiersCode & MOD_WIN) && hwnd != nullptr) {
+            result = RegisterHotKey(NULL, hotkey.id, modifiersCode, vkCode);
+            if (result) {
+                hotkey.registered = true;
+                hotkey.windowHandle = nullptr;
+                m_resourceHotkeys.insert(hotkey.id, hotkey);
+                qDebug() << "Resource hotkey registered with NULL handle (Win key workaround)";
+                return true;
+            }
+        }
+        return false;
+    }
+#else
+    return false;
+#endif
+}
+
+void HotkeyManager::unregisterResourceHotkeys(const QString& resourceId) {
+    qDebug() << "Unregistering hotkeys for resource:" << resourceId;
+    
+    QList<int> idsToRemove;
+    
+    // Find IDs to remove
+    for (auto it = m_resourceHotkeys.begin(); it != m_resourceHotkeys.end(); ++it) {
+        if (it.value().resourceId == resourceId) {
+            idsToRemove.append(it.key());
+        }
+    }
+    
+    // Unregister and remove
+    for (int id : idsToRemove) {
+        const ResourceHotkeyData& hotkey = m_resourceHotkeys[id];
+        if (hotkey.registered) {
+#ifdef _WIN32
+            UnregisterHotKey(static_cast<HWND>(hotkey.windowHandle), hotkey.id);
+#endif
+        }
+        m_resourceHotkeys.remove(id);
+    }
+}
+
 bool HotkeyManager::nativeEventFilter(const QByteArray& eventType,
                                        void* message,
                                        qintptr* result) {
@@ -408,14 +499,23 @@ bool HotkeyManager::nativeEventFilter(const QByteArray& eventType,
         MSG* msg = static_cast<MSG*>(message);
         
         if (msg->message == WM_HOTKEY) {
-            // Find hotkey by ID
+            // Check fixed hotkeys
             for (auto it = m_hotkeys.constBegin(); it != m_hotkeys.constEnd(); ++it) {
                 const HotkeyManager::HotkeyData& hotkey = it.value();
                 if (hotkey.registered && msg->wParam == hotkey.id) {
-                    qDebug() << "Hotkey pressed:" << HotkeyType::toDisplayName(it.key());
-                    qDebug() << "Emitting hotkeyPressed signal with type:" << it.key();
+                    qDebug() << "Fixed hotkey pressed:" << HotkeyType::toDisplayName(it.key());
                     emit hotkeyPressed(it.key());
-                    qDebug() << "hotkeyPressed signal emitted";
+                    return true;
+                }
+            }
+            
+            // Check resource hotkeys
+            auto it = m_resourceHotkeys.find(static_cast<int>(msg->wParam));
+            if (it != m_resourceHotkeys.end()) {
+                const ResourceHotkeyData& hotkey = it.value();
+                if (hotkey.registered) {
+                    qDebug() << "Resource hotkey pressed for:" << hotkey.resourceId << "Alt:" << hotkey.isAlt;
+                    emit resourceHotkeyPressed(hotkey.resourceId, hotkey.isAlt);
                     return true;
                 }
             }

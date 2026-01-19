@@ -65,6 +65,10 @@ public:
     bool getAutoTranslate() const;
     void setAutoTranslate(bool value);
     
+    // Raw config access (for ResourceManager)
+    QJsonObject getConfigObject() const;
+    void setConfigObject(const QJsonObject& config);
+    
 signals:
     void settingsChanged();
     

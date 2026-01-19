@@ -7,14 +7,14 @@
 namespace HotkeyType {
     enum Type {
         MainToggle = 0,
-        ShowAndTranslate,
+        AlternativeToggle,
         Count
     };
     
     inline const char* toString(Type type) {
         switch (type) {
-            case MainToggle: return "hotkey";
-            case ShowAndTranslate: return "showTranslateHotkey";
+            case MainToggle: return "mainToggleHotkey";
+            case AlternativeToggle: return "alternativeToggleHotkey";
             default: return "unknown";
         }
     }
@@ -22,7 +22,7 @@ namespace HotkeyType {
     inline const char* toDisplayName(Type type) {
         switch (type) {
             case MainToggle: return "Main Toggle";
-            case ShowAndTranslate: return "Show and Translate";
+            case AlternativeToggle: return "Alternative Toggle";
             default: return "Unknown";
         }
     }
@@ -41,6 +41,10 @@ public:
     void updateHotkey(HotkeyType::Type type, int key, Qt::KeyboardModifiers modifiers);
     void unregisterAll();
     
+    // Resource hotkey management
+    bool registerResourceHotkey(const QString& resourceId, bool isAlt, int key, Qt::KeyboardModifiers modifiers);
+    void unregisterResourceHotkeys(const QString& resourceId);
+
     // Query methods
     bool isHotkeyRegistered(HotkeyType::Type type) const;
     int getHotkeyKey(HotkeyType::Type type) const;
@@ -57,6 +61,7 @@ protected:
     
 signals:
     void hotkeyPressed(HotkeyType::Type type);
+    void resourceHotkeyPressed(const QString& resourceId, bool isAlt);
     
 private:
     struct HotkeyData {
@@ -67,8 +72,19 @@ private:
         void* windowHandle;
     };
     
+    struct ResourceHotkeyData {
+        int id;
+        QString resourceId;
+        bool isAlt;
+        int key;
+        Qt::KeyboardModifiers modifiers;
+        bool registered;
+        void* windowHandle;
+    };
+    
     // Map-based storage for dynamic hotkey management
     QMap<HotkeyType::Type, HotkeyData> m_hotkeys;
+    QMap<int, ResourceHotkeyData> m_resourceHotkeys; // Key: ID
     bool m_enabled;
     static int s_hotkeyIdCounter;
     

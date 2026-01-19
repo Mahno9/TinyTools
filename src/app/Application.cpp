@@ -5,6 +5,8 @@
 #include "../core/ClipboardManager.h"
 #include "../core/NetworkMonitor.h"
 #include "../models/AppConfig.h"
+#include "../models/ResourceManager.h"
+#include "../models/WebResource.h"
 #include <QApplication>
 #include <QDebug>
 
@@ -24,7 +26,7 @@ Application::~Application() {
 
 void Application::initialize() {
     qDebug() << "Application::initialize() - ENTRY";
-    qDebug() << "Initializing Yandex Translator application components...";
+    qDebug() << "Initializing TinyTools application components...";
     
     try {
         qDebug() << "Step 1: Loading configuration...";
@@ -42,7 +44,13 @@ void Application::initialize() {
             qDebug() << "Main hotkey key:" << AppConfig::instance()->getHotkeyKey(HotkeyType::MainToggle);
             qDebug() << "Main hotkey modifiers:" << QKeySequence(AppConfig::instance()->getHotkeyKey(HotkeyType::MainToggle) | AppConfig::instance()->getHotkeyModifiers(HotkeyType::MainToggle)).toString();
         }
+
         qDebug() << "Step 1 complete: Configuration loaded";
+        
+        // Fix: Explicitly load resources from config on startup
+        qDebug() << "Step 1.5: Loading resources...";
+        ResourceManager::instance()->loadFromConfig();
+        qDebug() << "Loaded " << ResourceManager::instance()->getResourceCount() << " resources";
         
         qDebug() << "Step 2: Setting up components...";
         setupComponents();
@@ -149,7 +157,18 @@ void Application::connectSignals() {
     }
     connect(m_hotkeyManager, &HotkeyManager::hotkeyPressed,
             this, &Application::onHotkeyPressed, Qt::UniqueConnection);
+            
+    connect(m_hotkeyManager, &HotkeyManager::resourceHotkeyPressed,
+            this, &Application::onResourceHotkeyPressed, Qt::UniqueConnection);
     qDebug() << "Hotkey signal connected successfully";
+    
+    // Resource Manager signals
+    connect(ResourceManager::instance(), &ResourceManager::resourceAdded,
+            this, &Application::onResourceAdded);
+    connect(ResourceManager::instance(), &ResourceManager::resourceRemoved,
+            this, &Application::onResourceRemoved);
+    connect(ResourceManager::instance(), &ResourceManager::resourceUpdated,
+            this, &Application::onResourceUpdated);
     
     // Network status changes
     qDebug() << "Connecting NetworkMonitor::onlineStatusChanged to Application::onNetworkStatusChanged...";
@@ -213,6 +232,9 @@ void Application::registerAllHotkeys() {
         }
     }
     
+    // Register resource hotkeys
+    registerResourceHotkeys();
+    
     qDebug() << "Application::registerAllHotkeys() - EXIT";
 }
 
@@ -266,11 +288,11 @@ void Application::onHotkeyPressed(int type) {
             }
             break;
             
-        case HotkeyType::ShowAndTranslate:
-            // Always show window and translate
-            qDebug() << "Show and translate - showing window with translation";
+        case HotkeyType::AlternativeToggle:
+            // Always show window and execute script
+            qDebug() << "Alternative toggle - showing window with script execution";
             m_mainWindow->showAndActivate();
-            m_mainWindow->insertClipboardText();
+            m_mainWindow->insertClipboardText(true);
             break;
             
         default:
@@ -316,6 +338,7 @@ void Application::onSettingsChanged() {
         if (m_hotkeyManager) {
             qDebug() << "Updating all hotkeys...";
             updateAllHotkeys();
+            registerResourceHotkeys(); // Re-register resource hotkeys too
             qDebug() << "All hotkeys updated successfully";
         } else {
             qWarning() << "Cannot update hotkeys - m_hotkeyManager is null";
@@ -329,5 +352,66 @@ void Application::onSettingsChanged() {
     } catch (const std::exception& e) {
         qCritical() << "Application::onSettingsChanged() - EXCEPTION:" << e.what();
         qDebug() << "Application::onSettingsChanged() - EXIT with error";
+    }
+}
+
+void Application::onResourceHotkeyPressed(const QString& resourceId, bool isAlt) {
+    qDebug() << "Resource hotkey pressed. ID:" << resourceId << "IsAlt:" << isAlt;
+    
+    if (m_mainWindow) {
+        m_mainWindow->switchToResourceById(resourceId);
+        m_mainWindow->showAndActivate();
+        m_mainWindow->insertClipboardText(isAlt);
+    }
+}
+
+void Application::onResourceAdded(const QString& resourceId) {
+    refreshResourceHotkeys(resourceId);
+}
+
+void Application::onResourceRemoved(const QString& resourceId) {
+    if (m_hotkeyManager) {
+        m_hotkeyManager->unregisterResourceHotkeys(resourceId);
+    }
+}
+
+void Application::onResourceUpdated(const QString& resourceId) {
+    refreshResourceHotkeys(resourceId);
+}
+
+void Application::refreshResourceHotkeys(const QString& resourceId) {
+    if (!m_hotkeyManager) return;
+    
+    // Always unregister first to be safe
+    m_hotkeyManager->unregisterResourceHotkeys(resourceId);
+    
+    WebResource res = ResourceManager::instance()->getResourceById(resourceId);
+    if (!res.isValid() || !res.isEnabled) return;
+    
+    // Register 'Open' hotkey
+    if (res.openHotkeyKey > 0) {
+        m_hotkeyManager->registerResourceHotkey(
+            resourceId, 
+            false, // isAlt = false
+            res.openHotkeyKey, 
+            res.openHotkeyModifiers
+        );
+    }
+    
+    // Register 'Alternative Open' hotkey
+    if (res.altOpenHotkeyKey > 0) {
+        m_hotkeyManager->registerResourceHotkey(
+            resourceId, 
+            true, // isAlt = true
+            res.altOpenHotkeyKey, 
+            res.altOpenHotkeyModifiers
+        );
+    }
+}
+
+void Application::registerResourceHotkeys() {
+    QList<WebResource> resources = ResourceManager::instance()->getAllResources();
+    for (const WebResource& res : resources) {
+        refreshResourceHotkeys(res.id);
     }
 }
