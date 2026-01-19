@@ -60,6 +60,10 @@ target_link_libraries(TinyTools PRIVATE
     Qt6::Network
 )
 
+if(WIN32)
+    target_link_libraries(TinyTools PRIVATE dwmapi)
+endif()
+
 # Windows-specific settings
 if(WIN32)
     set_target_properties(TinyTools PROPERTIES
