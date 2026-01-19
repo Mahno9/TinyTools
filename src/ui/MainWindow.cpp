@@ -414,10 +414,23 @@ void MainWindow::applyWebViewTheme(bool darkTheme) {
 }
 
 void MainWindow::onSettingsRequested() {
-  SettingsDialog dialog(this);
-  if (dialog.exec() == QDialog::Accepted) {
-    applySettings();
-  }
+  // Create dialog WITHOUT parent to avoid modality issues with frameless window
+  // The parent relationship was causing nativeEvent to stop working on Windows
+  SettingsDialog dialog(nullptr);
+  dialog.setWindowModality(Qt::ApplicationModal);
+  dialog.setAttribute(Qt::WA_DeleteOnClose, false);
+  // Ensure dialog appears above the main window (which may have
+  // WindowStaysOnTopHint)
+  dialog.setWindowFlags(dialog.windowFlags() | Qt::WindowStaysOnTopHint);
+
+  dialog.exec();
+
+  // Apply settings after dialog closes
+  applySettings();
+
+  // Ensure the main window is properly reactivated
+  activateWindow();
+  raise();
 }
 
 void MainWindow::applySettings() {
@@ -505,8 +518,6 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
     if (isMaximized())
       return false;
 
-    // Get mouse coordinates (use QCursor::pos() for reliable logical
-    // coordinates)
     QPoint localPos = mapFromGlobal(QCursor::pos());
 
     int w = width();
@@ -553,18 +564,11 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
 
     // Title bar (HTCAPTION)
     if (localPos.y() <= 30) {
-      // Check if hovering over buttons/tabs to avoid stealing clicks
       QWidget *child = childAt(localPos);
-      // If it's a button or tab bar, let Qt handle valid clicks (HTCLIENT)
-      // But verify hierarchy. childAt finds deepest widget.
       if (qobject_cast<QPushButton *>(child) ||
           qobject_cast<QTabBar *>(child)) {
         return false;
       }
-      // Also dragging handle is a widget itself?
-      // If child is m_dragHandle (container), then it IS the background we want
-      // to drag.
-
       *result = HTCAPTION;
       return true;
     }
