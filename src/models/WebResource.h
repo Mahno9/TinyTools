@@ -5,7 +5,6 @@
 #include <QUuid>
 #include <Qt>
 
-
 /**
  * @brief WebResource represents a single web resource configuration
  *
@@ -20,6 +19,7 @@ struct WebResource {
   QString iconPath; // Optional icon path (empty for default)
 
   // JavaScript automation scripts
+  QString initScript;    // JS executed once on initial page load
   QString openScript;    // JS executed on normal open
   QString altOpenScript; // JS executed on alternative open
 
@@ -48,6 +48,7 @@ struct WebResource {
     obj["name"] = name;
     obj["url"] = url;
     obj["iconPath"] = iconPath;
+    obj["initScript"] = initScript;
     obj["openScript"] = openScript;
     obj["altOpenScript"] = altOpenScript;
     obj["isEnabled"] = isEnabled;
@@ -64,6 +65,7 @@ struct WebResource {
     resource.name = obj["name"].toString();
     resource.url = obj["url"].toString();
     resource.iconPath = obj["iconPath"].toString();
+    resource.initScript = obj["initScript"].toString();
     resource.openScript = obj["openScript"].toString();
     resource.altOpenScript = obj["altOpenScript"].toString();
     resource.isEnabled = obj["isEnabled"].toBool(true);

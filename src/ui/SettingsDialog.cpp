@@ -398,6 +398,19 @@ public:
     urlLayout->addWidget(urlEdit, 1);
     m_contentLayout->addLayout(urlLayout);
 
+    // Init Script
+    m_contentLayout->addWidget(
+        new QLabel("Initialization Script (Executed once on load):"));
+
+    QPlainTextEdit *initScriptEdit = new QPlainTextEdit();
+    initScriptEdit->setObjectName("initScriptEdit");
+    initScriptEdit->setPlainText(resource.initScript);
+    initScriptEdit->setMaximumHeight(60);
+    initScriptEdit->setPlaceholderText(
+        "// JavaScript executed when page finishes loading");
+    m_contentLayout->addWidget(initScriptEdit);
+
+    // Open Script
     m_contentLayout->addWidget(new QLabel("Open Script (JavaScript):"));
 
     QPlainTextEdit *openScriptEdit = new QPlainTextEdit();
@@ -725,6 +738,8 @@ void SettingsDialog::saveResourceFromPanel(QWidget *widget,
 
   QLineEdit *nameEdit = content->findChild<QLineEdit *>("nameEdit");
   QLineEdit *urlEdit = content->findChild<QLineEdit *>("urlEdit");
+  QPlainTextEdit *initScriptEdit =
+      content->findChild<QPlainTextEdit *>("initScriptEdit");
   QPlainTextEdit *openScriptEdit =
       content->findChild<QPlainTextEdit *>("openScriptEdit");
   QPlainTextEdit *altScriptEdit =
@@ -734,6 +749,8 @@ void SettingsDialog::saveResourceFromPanel(QWidget *widget,
     resource.name = nameEdit->text();
   if (urlEdit)
     resource.url = urlEdit->text();
+  if (initScriptEdit)
+    resource.initScript = initScriptEdit->toPlainText();
   if (openScriptEdit)
     resource.openScript = openScriptEdit->toPlainText();
   if (altScriptEdit)

@@ -1,201 +1,201 @@
 #include "WebViewContainer.h"
 #include <QContextMenuEvent>
+#include <QDebug>
+#include <QTimer>
+#include <QWebEnginePage>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
-#include <QWebEnginePage>
-#include <QTimer>
-#include <QDebug>
 
-WebViewContainer::WebViewContainer(QWidget* parent)
-    : QWebEngineView(parent)
-    , m_darkThemeEnabled(false)
-    , m_darkThemeApplied(false)
-{
-    // Configure page
-    QWebEnginePage* page = new QWebEnginePage(this);
-    setPage(page);
-    
-    // Configure page settings for performance
-    QWebEngineSettings* settings = page->settings();
-    settings->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
-    settings->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
-    settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls, true);
-    settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
-    settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
-    settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
-    settings->setAttribute(QWebEngineSettings::ShowScrollBars, false);
-    
-    // Connect signals
-    connect(page, &QWebEnginePage::loadFinished,
-            this, &WebViewContainer::onLoadFinished);
-    connect(page, &QWebEnginePage::loadProgress,
-            this, &WebViewContainer::onLoadProgress);
-    connect(page, &QWebEnginePage::renderProcessTerminated,
-            this, &WebViewContainer::onRenderProcessTerminated);
+WebViewContainer::WebViewContainer(QWidget *parent)
+    : QWebEngineView(parent), m_darkThemeEnabled(false),
+      m_darkThemeApplied(false) {
+  // Configure page
+  QWebEnginePage *page = new QWebEnginePage(this);
+  setPage(page);
 
-    // Initial load blank or default? 
-    // We wait for loadResource to be called.
-    // load(QUrl("about:blank"));
+  // Configure page settings for performance
+  QWebEngineSettings *settings = page->settings();
+  settings->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
+  settings->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
+  settings->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls,
+                         true);
+  settings->setAttribute(QWebEngineSettings::LocalStorageEnabled, true);
+  settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
+  settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
+  settings->setAttribute(QWebEngineSettings::ShowScrollBars, false);
+
+  // Connect signals
+  connect(page, &QWebEnginePage::loadFinished, this,
+          &WebViewContainer::onLoadFinished);
+  connect(page, &QWebEnginePage::loadProgress, this,
+          &WebViewContainer::onLoadProgress);
+  connect(page, &QWebEnginePage::renderProcessTerminated, this,
+          &WebViewContainer::onRenderProcessTerminated);
+
+  // Initial load blank or default?
+  // We wait for loadResource to be called.
+  // load(QUrl("about:blank"));
 }
 
-void WebViewContainer::loadResource(const WebResource& resource) {
-    qDebug() << "WebViewContainer::loadResource() - ENTRY";
-    qDebug() << "  Name:" << resource.name;
-    qDebug() << "  URL String:" << resource.url;
-    
-    m_openScript = resource.openScript;
-    m_altOpenScript = resource.altOpenScript;
-    
-    QUrl url(resource.url);
-    if (!url.isValid()) {
-        qWarning() << "  WARNING: URL is invalid!";
-    } else {
-        qDebug() << "  Parsed QUrl scheme:" << url.scheme();
-        qDebug() << "  Parsed QUrl host:" << url.host();
-    }
-    
-    qInfo() << "Triggering load(QUrl)...";
-    load(url);
-    qDebug() << "WebViewContainer::loadResource() - EXIT";
+void WebViewContainer::loadResource(const WebResource &resource) {
+  qDebug() << "WebViewContainer::loadResource() - ENTRY";
+  qDebug() << "  Name:" << resource.name;
+  qDebug() << "  URL String:" << resource.url;
+
+  m_openScript = resource.openScript;
+  m_altOpenScript = resource.altOpenScript;
+  m_initScript = resource.initScript;
+
+  QUrl url(resource.url);
+  if (!url.isValid()) {
+    qWarning() << "  WARNING: URL is invalid!";
+  } else {
+    qDebug() << "  Parsed QUrl scheme:" << url.scheme();
+    qDebug() << "  Parsed QUrl host:" << url.host();
+  }
+
+  qInfo() << "Triggering load(QUrl)...";
+  load(url);
+  qDebug() << "WebViewContainer::loadResource() - EXIT";
 }
 
-void WebViewContainer::executeScript(const QString& script) {
-    if (script.isEmpty()) return;
-    injectJavaScript(script);
+void WebViewContainer::executeScript(const QString &script) {
+  if (script.isEmpty())
+    return;
+  injectJavaScript(script);
 }
 
-void WebViewContainer::insertText(const QString& text) {
-    if (isLoading()) {
-        qWarning() << "Cannot execute open script: page is loading";
-        return;
-    }
-    
-    if (m_openScript.isEmpty()) {
-        qDebug() << "No open script defined for this resource";
-        return;
-    }
-    
-    // Replace %1 with escaped text
-    // Basic escaping: escape backslashes and quotes
-    QString safeText = text;
-    safeText.replace("\\", "\\\\");
-    safeText.replace("'", "\\'");
-    safeText.replace("\"", "\\\"");
-    safeText.replace("\n", "\\n");
-    safeText.replace("\r", "");
-    
-    QString script = m_openScript;
-    // Simple replacement - cleaner would be to pass text as argument to a function
-    // But for now we assume user writes "input.value = '%1';"
-    script.replace("%1", safeText);
-    
-    qDebug() << "Executing open script with text length:" << text.length();
-    injectJavaScript(script);
+void WebViewContainer::insertText(const QString &text) {
+  if (isLoading()) {
+    qWarning() << "Cannot execute open script: page is loading";
+    return;
+  }
+
+  if (m_openScript.isEmpty()) {
+    qDebug() << "No open script defined for this resource";
+    return;
+  }
+
+  // Replace %1 with escaped text
+  // Basic escaping: escape backslashes and quotes
+  QString safeText = text;
+  safeText.replace("\\", "\\\\");
+  safeText.replace("'", "\\'");
+  safeText.replace("\"", "\\\"");
+  safeText.replace("\n", "\\n");
+  safeText.replace("\r", "");
+
+  QString script = m_openScript;
+  // Simple replacement - cleaner would be to pass text as argument to a
+  // function But for now we assume user writes "input.value = '%1';"
+  script.replace("%1", safeText);
+
+  qDebug() << "Executing open script with text length:" << text.length();
+  injectJavaScript(script);
 }
 
-void WebViewContainer::insertAltText(const QString& text) {
-    if (isLoading()) {
-        qWarning() << "Cannot execute alt script: page is loading";
-        return;
-    }
-    
-    if (m_altOpenScript.isEmpty()) {
-        qDebug() << "No alternative open script defined for this resource";
-        return;
-    }
-    
-    QString safeText = text;
-    safeText.replace("\\", "\\\\");
-    safeText.replace("'", "\\'");
-    safeText.replace("\"", "\\\"");
-    safeText.replace("\n", "\\n");
-    safeText.replace("\r", "");
-    
-    QString script = m_altOpenScript;
-    script.replace("%1", safeText);
-    
-    qDebug() << "Executing alternative open script with text length:" << text.length();
-    injectJavaScript(script);
+void WebViewContainer::insertAltText(const QString &text) {
+  if (isLoading()) {
+    qWarning() << "Cannot execute alt script: page is loading";
+    return;
+  }
+
+  if (m_altOpenScript.isEmpty()) {
+    qDebug() << "No alternative open script defined for this resource";
+    return;
+  }
+
+  QString safeText = text;
+  safeText.replace("\\", "\\\\");
+  safeText.replace("'", "\\'");
+  safeText.replace("\"", "\\\"");
+  safeText.replace("\n", "\\n");
+  safeText.replace("\r", "");
+
+  QString script = m_altOpenScript;
+  script.replace("%1", safeText);
+
+  qDebug() << "Executing alternative open script with text length:"
+           << text.length();
+  injectJavaScript(script);
 }
 
-void WebViewContainer::reloadTranslator() {
-    reload();
-}
+void WebViewContainer::reloadTranslator() { reload(); }
 
 bool WebViewContainer::isLoading() const {
-    return page() && page()->isLoading();
+  return page() && page()->isLoading();
 }
 
 void WebViewContainer::onLoadFinished(bool ok) {
-    if (ok) {
-        qDebug() << "Page loaded successfully";
-        emit pageLoaded(true);
-        
-        // Reapply dark theme if enabled? 
-        // Theme logic is now Yandex-specific and removed. 
-        // If users want themes, they should use user scripts.
-    } else {
-        qWarning() << "Page load failed";
-        emit loadError("Failed to load resource page");
-        emit pageLoaded(false);
+  if (ok) {
+    qDebug() << "Page loaded successfully";
+    emit pageLoaded(true);
+
+    if (!m_initScript.isEmpty()) {
+      qDebug() << "Executing initialization script...";
+      injectJavaScript(m_initScript);
     }
+  } else {
+    qWarning() << "Page load failed";
+    emit loadError("Failed to load resource page");
+    emit pageLoaded(false);
+  }
 }
 
 void WebViewContainer::onLoadProgress(int progress) {
-    if (progress % 25 == 0) {
-        qDebug() << "Loading progress:" << progress << "%";
-    }
+  if (progress % 25 == 0) {
+    qDebug() << "Loading progress:" << progress << "%";
+  }
 }
 
 void WebViewContainer::onRenderProcessTerminated(
-    QWebEnginePage::RenderProcessTerminationStatus status, 
-    int exitCode)
-{
-    Q_UNUSED(exitCode);
-    
-    QString reason;
-    switch (status) {
-        case QWebEnginePage::NormalTerminationStatus:
-            reason = "Normal termination";
-            break;
-        case QWebEnginePage::AbnormalTerminationStatus:
-            reason = "Abnormal termination";
-            break;
-        case QWebEnginePage::CrashedTerminationStatus:
-            reason = "Render process crashed";
-            break;
-        case QWebEnginePage::KilledTerminationStatus:
-            reason = "Render process killed";
-            break;
-    }
-    
-    qCritical() << "Render process terminated:" << reason;
-    emit loadError(reason);
-    
-    // Attempt to reload
-    QTimer::singleShot(1000, this, &WebViewContainer::reload);
+    QWebEnginePage::RenderProcessTerminationStatus status, int exitCode) {
+  Q_UNUSED(exitCode);
+
+  QString reason;
+  switch (status) {
+  case QWebEnginePage::NormalTerminationStatus:
+    reason = "Normal termination";
+    break;
+  case QWebEnginePage::AbnormalTerminationStatus:
+    reason = "Abnormal termination";
+    break;
+  case QWebEnginePage::CrashedTerminationStatus:
+    reason = "Render process crashed";
+    break;
+  case QWebEnginePage::KilledTerminationStatus:
+    reason = "Render process killed";
+    break;
+  }
+
+  qCritical() << "Render process terminated:" << reason;
+  emit loadError(reason);
+
+  // Attempt to reload
+  QTimer::singleShot(1000, this, &WebViewContainer::reload);
 }
 
-void WebViewContainer::injectJavaScript(const QString& script) {
-    if (!page()) return;
-    
-    page()->runJavaScript(script, [this](const QVariant& result) {
-        // Optional: handle result
-    });
+void WebViewContainer::injectJavaScript(const QString &script) {
+  if (!page())
+    return;
+
+  page()->runJavaScript(script, [this](const QVariant &result) {
+    // Optional: handle result
+  });
 }
 
 void WebViewContainer::waitForPageLoad() {
-    // No-op
+  // No-op
 }
 
-void WebViewContainer::contextMenuEvent(QContextMenuEvent* event) {
-    // Disable context menu for cleaner UI
-    event->ignore();
+void WebViewContainer::contextMenuEvent(QContextMenuEvent *event) {
+  // Disable context menu for cleaner UI
+  event->ignore();
 }
 
 void WebViewContainer::applyWebViewTheme(bool darkTheme) {
-    m_darkThemeEnabled = darkTheme;
-    // Removed hardcoded Yandex theme logic.
-    // TODO: Allow generic theme scripts?
+  m_darkThemeEnabled = darkTheme;
+  // Removed hardcoded Yandex theme logic.
+  // TODO: Allow generic theme scripts?
 }
