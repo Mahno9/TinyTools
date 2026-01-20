@@ -178,6 +178,9 @@ void Application::connectSignals() {
         << "ERROR: Cannot connect hotkey signal - m_hotkeyManager is null";
     throw std::runtime_error("HotkeyManager is null");
   }
+  connect(m_hotkeyManager, &HotkeyManager::hotkeyPressed, this,
+          &Application::onHotkeyPressed);
+  qDebug() << "Hotkey signal connected successfully";
 
   // Network status changes
   qDebug() << "Connecting NetworkMonitor::onlineStatusChanged to "
@@ -281,8 +284,17 @@ void Application::onHotkeyPressed(int type) {
 
   HotkeyType::Type hotkeyType = static_cast<HotkeyType::Type>(type);
 
-  // Common behavior: Show window and ensure correct tab is selected based on
-  // settings
+  // Toggle behavior: if window is visible, hide it; otherwise show and run
+  // script
+  if (m_mainWindow->isVisible() && !m_mainWindow->isMinimized()) {
+    qDebug() << "Window is visible - hiding";
+    m_mainWindow->hide();
+    qDebug() << "Application::onHotkeyPressed() - EXIT (hidden)";
+    return;
+  }
+
+  // Window is hidden or minimized - show it
+  qDebug() << "Window is hidden - showing and executing script";
   m_mainWindow->showAndActivate();
 
   // Handle Startup Behavior (e.g. switch to default tab if configured)
