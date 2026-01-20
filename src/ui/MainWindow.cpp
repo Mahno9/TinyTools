@@ -266,6 +266,12 @@ void MainWindow::loadCurrentResource() {
     WebViewContainer *view = m_resourceViews[m_currentResourceId];
     m_stackedWidget->setCurrentWidget(view);
     m_webView = view;
+
+    // Ensure event filter is installed on focusProxy (may not exist at creation
+    // time)
+    if (view->focusProxy()) {
+      view->focusProxy()->installEventFilter(this);
+    }
   } else {
     // Create new view
     qDebug() << "Creating new view for ID:" << m_currentResourceId;
@@ -275,8 +281,12 @@ void MainWindow::loadCurrentResource() {
     if (resource.isValid()) {
       WebViewContainer *view = new WebViewContainer(this);
 
-      // Install event filter to intercept Alt+Number before WebView handles it
+      // Install event filter on both the view and its focus proxy
+      // The focus proxy is the actual widget that receives keyboard events
       view->installEventFilter(this);
+      if (view->focusProxy()) {
+        view->focusProxy()->installEventFilter(this);
+      }
 
       // Connect zoom signal
       connect(view, &WebViewContainer::zoomChanged, this,
