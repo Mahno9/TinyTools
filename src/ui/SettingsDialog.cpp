@@ -3,6 +3,8 @@
 #include "../models/AppConfig.h"
 #include "../models/ResourceManager.h"
 #include "../models/WebResource.h"
+#include "HotkeyEdit.h"
+
 #ifdef Q_OS_WIN
 #include <dwmapi.h>
 #endif
@@ -153,23 +155,10 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
   mainHotkeyLayout->addRow(
       new QLabel("Open window and execute Main Script", this));
 
-  m_hotkeyKeyLineEdit = new QLineEdit(this);
-  m_hotkeyKeyLineEdit->setToolTip(
-      "Enter key code (e.g., 84 for 'T') or character");
-  m_hotkeyKeyLineEdit->setMaxLength(3);
-  m_hotkeyKeyLineEdit->setPlaceholderText("84 or T");
-  mainHotkeyLayout->addRow("Key:", m_hotkeyKeyLineEdit);
-
-  m_hotkeyModifierCtrl = new QCheckBox("Ctrl", this);
-  m_hotkeyModifierAlt = new QCheckBox("Alt", this);
-  m_hotkeyModifierShift = new QCheckBox("Shift", this);
-
-  QHBoxLayout *modifiersLayout = new QHBoxLayout();
-  modifiersLayout->addWidget(m_hotkeyModifierCtrl);
-  modifiersLayout->addWidget(m_hotkeyModifierAlt);
-  modifiersLayout->addWidget(m_hotkeyModifierShift);
-  modifiersLayout->addStretch();
-  mainHotkeyLayout->addRow("Modifiers:", modifiersLayout);
+  m_mainHotkeyEdit = new HotkeyEdit(this);
+  m_mainHotkeyEdit->setToolTip(
+      "Click Record and press the desired key combination");
+  mainHotkeyLayout->addRow("Hotkey:", m_mainHotkeyEdit);
 
   layout->addWidget(mainHotkeyGroup);
 
@@ -180,23 +169,10 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
   altHotkeyLayout->addRow(
       new QLabel("Open window and execute Alternative Script", this));
 
-  m_altToggleKeyLineEdit = new QLineEdit(this);
-  m_altToggleKeyLineEdit->setToolTip(
-      "Enter key code (e.g., 83 for 'S') or character");
-  m_altToggleKeyLineEdit->setMaxLength(3);
-  m_altToggleKeyLineEdit->setPlaceholderText("83 or S");
-  altHotkeyLayout->addRow("Key:", m_altToggleKeyLineEdit);
-
-  m_altToggleModifierCtrl = new QCheckBox("Ctrl", this);
-  m_altToggleModifierAlt = new QCheckBox("Alt", this);
-  m_altToggleModifierShift = new QCheckBox("Shift", this);
-
-  QHBoxLayout *altModifiersLayout = new QHBoxLayout();
-  altModifiersLayout->addWidget(m_altToggleModifierCtrl);
-  altModifiersLayout->addWidget(m_altToggleModifierAlt);
-  altModifiersLayout->addWidget(m_altToggleModifierShift);
-  altModifiersLayout->addStretch();
-  altHotkeyLayout->addRow("Modifiers:", altModifiersLayout);
+  m_altHotkeyEdit = new HotkeyEdit(this);
+  m_altHotkeyEdit->setToolTip(
+      "Click Record and press the desired key combination");
+  altHotkeyLayout->addRow("Hotkey:", m_altHotkeyEdit);
 
   layout->addWidget(altHotkeyGroup);
 
@@ -559,23 +535,15 @@ void SettingsDialog::loadSettings() {
 
   // Load Main Toggle hotkey
   int mainKey = config->getHotkeyKey(HotkeyType::MainToggle);
-  m_hotkeyKeyLineEdit->setText(QString::number(mainKey));
-
   Qt::KeyboardModifiers mainMod =
       config->getHotkeyModifiers(HotkeyType::MainToggle);
-  m_hotkeyModifierCtrl->setChecked(mainMod & Qt::ControlModifier);
-  m_hotkeyModifierAlt->setChecked(mainMod & Qt::AltModifier);
-  m_hotkeyModifierShift->setChecked(mainMod & Qt::ShiftModifier);
+  m_mainHotkeyEdit->setHotkey(mainKey, mainMod);
 
   // Load Alternative Toggle hotkey
   int altKey = config->getHotkeyKey(HotkeyType::AlternativeToggle);
-  m_altToggleKeyLineEdit->setText(QString::number(altKey));
-
   Qt::KeyboardModifiers altMod =
       config->getHotkeyModifiers(HotkeyType::AlternativeToggle);
-  m_altToggleModifierCtrl->setChecked(altMod & Qt::ControlModifier);
-  m_altToggleModifierAlt->setChecked(altMod & Qt::AltModifier);
-  m_altToggleModifierShift->setChecked(altMod & Qt::ShiftModifier);
+  m_altHotkeyEdit->setHotkey(altKey, altMod);
 
   // Load window settings
   m_alwaysOnTopCheckBox->setChecked(config->getAlwaysOnTop());
@@ -651,35 +619,17 @@ void SettingsDialog::saveSettings() {
   AppConfig *config = AppConfig::instance();
 
   // Save Main Toggle hotkey
-  QString mainKeyText = m_hotkeyKeyLineEdit->text().trimmed();
-  int mainKey = stringToKeyCode(mainKeyText);
-  if (mainKey == -1)
+  int mainKey = m_mainHotkeyEdit->key();
+  if (mainKey == 0)
     mainKey = Qt::Key_T;
-
-  Qt::KeyboardModifiers mainMod = Qt::NoModifier;
-  if (m_hotkeyModifierCtrl->isChecked())
-    mainMod |= Qt::ControlModifier;
-  if (m_hotkeyModifierAlt->isChecked())
-    mainMod |= Qt::AltModifier;
-  if (m_hotkeyModifierShift->isChecked())
-    mainMod |= Qt::ShiftModifier;
-
+  Qt::KeyboardModifiers mainMod = m_mainHotkeyEdit->modifiers();
   config->setHotkey(HotkeyType::MainToggle, mainKey, mainMod);
 
   // Save Alternative Toggle hotkey
-  QString altKeyText = m_altToggleKeyLineEdit->text().trimmed();
-  int altKey = stringToKeyCode(altKeyText);
-  if (altKey == -1)
+  int altKey = m_altHotkeyEdit->key();
+  if (altKey == 0)
     altKey = Qt::Key_S;
-
-  Qt::KeyboardModifiers altMod = Qt::NoModifier;
-  if (m_altToggleModifierCtrl->isChecked())
-    altMod |= Qt::ControlModifier;
-  if (m_altToggleModifierAlt->isChecked())
-    altMod |= Qt::AltModifier;
-  if (m_altToggleModifierShift->isChecked())
-    altMod |= Qt::ShiftModifier;
-
+  Qt::KeyboardModifiers altMod = m_altHotkeyEdit->modifiers();
   config->setHotkey(HotkeyType::AlternativeToggle, altKey, altMod);
 
   // Save window settings
@@ -783,16 +733,9 @@ void SettingsDialog::onAccepted() {
 }
 
 void SettingsDialog::onResetClicked() {
-  // Reset General tab
-  m_hotkeyKeyLineEdit->setText("84");
-  m_hotkeyModifierCtrl->setChecked(true);
-  m_hotkeyModifierAlt->setChecked(true);
-  m_hotkeyModifierShift->setChecked(false);
-
-  m_altToggleKeyLineEdit->setText("83");
-  m_altToggleModifierCtrl->setChecked(true);
-  m_altToggleModifierAlt->setChecked(true);
-  m_altToggleModifierShift->setChecked(false);
+  // Reset General tab - hotkeys
+  m_mainHotkeyEdit->setHotkey(Qt::Key_T, Qt::ControlModifier | Qt::AltModifier);
+  m_altHotkeyEdit->setHotkey(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier);
 
   m_alwaysOnTopCheckBox->setChecked(true);
   m_opacitySpinBox->setValue(90);

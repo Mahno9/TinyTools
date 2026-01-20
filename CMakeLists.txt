@@ -28,6 +28,7 @@ set(SOURCES
     src/ui/MainWindow.cpp
     src/ui/SettingsDialog.cpp
     src/ui/WebViewContainer.cpp
+    src/ui/HotkeyEdit.cpp
     src/tray/TrayIcon.cpp
     src/models/AppConfig.cpp
     src/models/ResourceManager.cpp
@@ -43,6 +44,7 @@ set(HEADERS
     src/ui/MainWindow.h
     src/ui/SettingsDialog.h
     src/ui/WebViewContainer.h
+    src/ui/HotkeyEdit.h
     src/tray/TrayIcon.h
     src/models/AppConfig.h
     src/models/WebResource.h
