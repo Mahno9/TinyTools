@@ -155,6 +155,9 @@ void WebViewContainer::onLoadFinished(bool ok) {
     qDebug() << "Page loaded successfully";
     emit pageLoaded(true);
 
+    // Apply dark theme preference to the page
+    applyWebViewTheme(m_darkThemeEnabled);
+
     if (!m_initScript.isEmpty()) {
       qDebug() << "Executing initialization script...";
       injectJavaScript(m_initScript);
@@ -219,8 +222,73 @@ void WebViewContainer::contextMenuEvent(QContextMenuEvent *event) {
 
 void WebViewContainer::applyWebViewTheme(bool darkTheme) {
   m_darkThemeEnabled = darkTheme;
-  // Removed hardcoded Yandex theme logic.
-  // TODO: Allow generic theme scripts?
+
+  if (!page())
+    return;
+
+  // Remove any existing theme script
+  QWebEngineScriptCollection &scripts = page()->scripts();
+  QList<QWebEngineScript> existingScripts =
+      scripts.find("__colorSchemeOverride");
+  for (const QWebEngineScript &s : existingScripts) {
+    scripts.remove(s);
+  }
+
+  // Create JavaScript that overrides matchMedia BEFORE any page JS runs
+  QString scriptSource = QString(R"(
+    (function() {
+      const isDark = %1;
+      const colorScheme = isDark ? 'dark' : 'light';
+      
+      // Override matchMedia for prefers-color-scheme queries
+      const originalMatchMedia = window.matchMedia.bind(window);
+      Object.defineProperty(window, 'matchMedia', {
+        value: function(query) {
+          if (query === '(prefers-color-scheme: dark)') {
+            return {
+              matches: isDark,
+              media: query,
+              onchange: null,
+              addListener: function(cb) { /* deprecated */ },
+              removeListener: function(cb) { /* deprecated */ },
+              addEventListener: function(type, cb) {},
+              removeEventListener: function(type, cb) {},
+              dispatchEvent: function(e) { return true; }
+            };
+          } else if (query === '(prefers-color-scheme: light)') {
+            return {
+              matches: !isDark,
+              media: query,
+              onchange: null,
+              addListener: function(cb) {},
+              removeListener: function(cb) {},
+              addEventListener: function(type, cb) {},
+              removeEventListener: function(type, cb) {},
+              dispatchEvent: function(e) { return true; }
+            };
+          }
+          return originalMatchMedia(query);
+        },
+        writable: false,
+        configurable: false
+      });
+      
+      console.log('[TinyTools] Color scheme preference applied:', colorScheme);
+    })();
+  )")
+                             .arg(darkTheme ? "true" : "false");
+
+  // Create user script that runs at document creation (BEFORE page JS)
+  QWebEngineScript script;
+  script.setName("__colorSchemeOverride");
+  script.setSourceCode(scriptSource);
+  script.setInjectionPoint(QWebEngineScript::DocumentCreation);
+  script.setWorldId(QWebEngineScript::MainWorld);
+  script.setRunsOnSubFrames(true);
+
+  scripts.insert(script);
+
+  qDebug() << "WebView theme script installed, dark mode:" << darkTheme;
 }
 
 bool WebViewContainer::eventFilter(QObject *obj, QEvent *event) {
