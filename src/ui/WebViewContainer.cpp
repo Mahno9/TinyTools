@@ -3,18 +3,37 @@
 #include <QChildEvent>
 #include <QContextMenuEvent>
 #include <QDebug>
+#include <QStandardPaths>
 #include <QTimer>
 #include <QWebEnginePage>
+#include <QWebEngineProfile>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <QWheelEvent>
 
+// Static persistent profile shared across all WebViewContainers
+static QWebEngineProfile *getPersistentProfile() {
+  static QWebEngineProfile *profile = nullptr;
+  if (!profile) {
+    // Create persistent profile with storage path
+    QString storagePath =
+        QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    profile = new QWebEngineProfile("TinyTools", nullptr);
+    profile->setPersistentStoragePath(storagePath + "/WebEngineData");
+    profile->setCachePath(storagePath + "/WebEngineCache");
+    profile->setPersistentCookiesPolicy(
+        QWebEngineProfile::AllowPersistentCookies);
+    qDebug() << "Created persistent WebEngine profile at:" << storagePath;
+  }
+  return profile;
+}
+
 WebViewContainer::WebViewContainer(QWidget *parent)
     : QWebEngineView(parent), m_darkThemeEnabled(false),
       m_darkThemeApplied(false) {
-  // Configure page
-  QWebEnginePage *page = new QWebEnginePage(this);
+  // Configure page with persistent profile for cookie/auth persistence
+  QWebEnginePage *page = new QWebEnginePage(getPersistentProfile(), this);
   setPage(page);
 
   // Configure page settings for performance
