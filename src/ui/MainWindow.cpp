@@ -275,6 +275,9 @@ void MainWindow::loadCurrentResource() {
     if (resource.isValid()) {
       WebViewContainer *view = new WebViewContainer(this);
 
+      // Install event filter to intercept Alt+Number before WebView handles it
+      view->installEventFilter(this);
+
       // Connect zoom signal
       connect(view, &WebViewContainer::zoomChanged, this,
               &MainWindow::onZoomChanged);
@@ -470,6 +473,22 @@ void MainWindow::onCloseButtonClicked() { hide(); }
 void MainWindow::onMinimizeButtonClicked() { showMinimized(); }
 
 void MainWindow::onSettingsButtonClicked() { onSettingsRequested(); }
+
+bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
+  // Intercept key events from WebView to handle Alt+Number tab switching
+  if (event->type() == QEvent::KeyPress) {
+    QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
+    if (keyEvent->modifiers() & Qt::AltModifier) {
+      int key = keyEvent->key();
+      if (key >= Qt::Key_1 && key <= Qt::Key_9) {
+        int index = key - Qt::Key_1;
+        switchToResource(index);
+        return true; // Event handled, don't propagate to WebView
+      }
+    }
+  }
+  return QMainWindow::eventFilter(watched, event);
+}
 
 void MainWindow::keyPressEvent(QKeyEvent *event) {
   // Handle Alt + Number for tab switching
