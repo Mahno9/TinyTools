@@ -1,4 +1,5 @@
 #include "WebViewContainer.h"
+#include "../models/ResourceManager.h"
 #include <QChildEvent>
 #include <QContextMenuEvent>
 #include <QDebug>
@@ -84,13 +85,17 @@ void WebViewContainer::insertText(const QString &text) {
     return;
   }
 
-  if (m_openScript.isEmpty()) {
+  // Get fresh script from ResourceManager (in case it was updated in settings)
+  WebResource resource =
+      ResourceManager::instance()->getResourceById(m_resourceId);
+  QString openScript = resource.isValid() ? resource.openScript : m_openScript;
+
+  if (openScript.isEmpty()) {
     qDebug() << "No open script defined for this resource";
     return;
   }
 
   // Replace %1 with escaped text
-  // Basic escaping: escape backslashes and quotes
   QString safeText = text;
   safeText.replace("\\", "\\\\");
   safeText.replace("'", "\\'");
@@ -98,10 +103,9 @@ void WebViewContainer::insertText(const QString &text) {
   safeText.replace("\n", "\\n");
   safeText.replace("\r", "");
 
-  QString script = m_openScript;
-  // Simple replacement - cleaner would be to pass text as argument to a
-  // function But for now we assume user writes "input.value = '%1';"
+  QString script = openScript;
   script.replace("%1", safeText);
+  script.replace("%CLIPBOARD%", safeText);
 
   qDebug() << "Executing open script with text length:" << text.length();
   injectJavaScript(script);
@@ -113,7 +117,13 @@ void WebViewContainer::insertAltText(const QString &text) {
     return;
   }
 
-  if (m_altOpenScript.isEmpty()) {
+  // Get fresh script from ResourceManager (in case it was updated in settings)
+  WebResource resource =
+      ResourceManager::instance()->getResourceById(m_resourceId);
+  QString altScript =
+      resource.isValid() ? resource.altOpenScript : m_altOpenScript;
+
+  if (altScript.isEmpty()) {
     qDebug() << "No alternative open script defined for this resource";
     return;
   }
@@ -125,8 +135,9 @@ void WebViewContainer::insertAltText(const QString &text) {
   safeText.replace("\n", "\\n");
   safeText.replace("\r", "");
 
-  QString script = m_altOpenScript;
+  QString script = altScript;
   script.replace("%1", safeText);
+  script.replace("%CLIPBOARD%", safeText);
 
   qDebug() << "Executing alternative open script with text length:"
            << text.length();
