@@ -5,11 +5,13 @@
 #include "../models/WebResource.h"
 #include "SettingsDialog.h"
 #include "WebViewContainer.h"
+#include <QAction>
 #include <QCloseEvent>
 #include <QDebug>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QMenu>
 #include <QMessageBox>
 #include <QMouseEvent>
 #include <QPushButton>
@@ -70,6 +72,49 @@ MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
   }
 }
 
+void MainWindow::onTabContextMenuRequested(const QPoint &pos) {
+  int index = m_tabBar->tabAt(pos);
+  if (index != -1) {
+    QMenu menu(this);
+    QAction *refreshAction = menu.addAction("Refresh");
+    connect(refreshAction, &QAction::triggered, this, [this, index]() {
+      if (index >= 0 && index < m_tabResourceIds.size()) {
+        reloadResource(m_tabResourceIds[index]);
+      }
+    });
+    menu.exec(m_tabBar->mapToGlobal(pos));
+  }
+}
+
+void MainWindow::onRefreshTriggered() {
+  if (!m_currentResourceId.isEmpty()) {
+    reloadResource(m_currentResourceId);
+  }
+}
+
+void MainWindow::reloadResource(const QString &resourceId) {
+  QString id = resourceId;
+  if (id.isEmpty()) {
+    id = m_currentResourceId;
+  }
+
+  if (id.isEmpty())
+    return;
+
+  if (m_resourceViews.contains(id)) {
+    qDebug() << "Reloading resource:" << id;
+    m_resourceViews[id]->reloadTranslator();
+  } else {
+    // If not loaded yet and we are reloading the CURRENT one, load it.
+    // If it's a background tab, we might skip loading it until switched to,
+    // but the user explicitly asked for a refresh, so maybe force load?
+    // For now, if it's the current one, loadCurrentResource() will do.
+    if (id == m_currentResourceId) {
+      loadCurrentResource();
+    }
+  }
+}
+
 MainWindow::~MainWindow() {
   // Save window state
   AppConfig *config = AppConfig::instance();
@@ -123,7 +168,22 @@ void MainWindow::setupUI() {
       "   background: #333; color: #fff; "
       "}");
   connect(m_tabBar, &QTabBar::currentChanged, this, &MainWindow::onTabChanged);
+
+  // Enable context menu for tabs
+  m_tabBar->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(m_tabBar, &QTabBar::customContextMenuRequested, this,
+          &MainWindow::onTabContextMenuRequested);
+
   dragHandleLayout->addWidget(m_tabBar);
+
+  // Initialize Refresh Action (Global Shortcut)
+  m_refreshAction = new QAction(this);
+  m_refreshAction->setText("Refresh");
+  m_refreshAction->setShortcut(QKeySequence("F5"));
+  m_refreshAction->setShortcuts({QKeySequence("F5"), QKeySequence("Ctrl+R")});
+  connect(m_refreshAction, &QAction::triggered, this,
+          &MainWindow::onRefreshTriggered);
+  addAction(m_refreshAction); // Add to window to enable shortcuts
 
   dragHandleLayout->addStretch();
 

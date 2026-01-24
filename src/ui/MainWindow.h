@@ -56,6 +56,8 @@ private slots:
   void onSettingsButtonClicked();
   void onTabChanged(int index);
   void onZoomChanged(const QString &resourceId, double zoomFactor);
+  void onTabContextMenuRequested(const QPoint &pos);
+  void onRefreshTriggered();
 
 private:
   void setupUI();
@@ -63,6 +65,7 @@ private:
   void setupWebView();
   void applySettings();
   void loadCurrentResource();
+  void reloadResource(const QString &resourceId = QString());
 
   QPointer<ClipboardManager> m_clipboardManager;
 
@@ -83,6 +86,8 @@ private:
 
   QList<QString> m_tabResourceIds;
   QString m_currentResourceId;
+
+  QAction *m_refreshAction;
 
   static constexpr int DEFAULT_WIDTH = 800;
   static constexpr int DEFAULT_HEIGHT = 600;
