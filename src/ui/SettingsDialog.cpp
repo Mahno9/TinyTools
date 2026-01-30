@@ -753,7 +753,7 @@ void SettingsDialog::onResetClicked() {
   applySettings();
 }
 
-void SettingsDialog::onOpacityChanged(int value) { Q_UNUSED(value); }
+void SettingsDialog::onOpacityChanged(int value) { emit testOpacity(value); }
 
 int SettingsDialog::stringToKeyCode(const QString &text) {
   if (text.isEmpty())

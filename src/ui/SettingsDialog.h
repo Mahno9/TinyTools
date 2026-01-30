@@ -42,6 +42,9 @@ private slots:
   void onExportPresetsClicked();
   void onStartupModeChanged();
 
+signals:
+  void testOpacity(int value);
+
 private:
   void setupUI();
   void setupGeneralTab(QWidget *tab);

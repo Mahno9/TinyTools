@@ -496,10 +496,20 @@ void MainWindow::onSettingsRequested() {
   // WindowStaysOnTopHint)
   dialog.setWindowFlags(dialog.windowFlags() | Qt::WindowStaysOnTopHint);
 
-  dialog.exec();
+  // Store original opacity to revert if cancelled
+  int originalOpacity = AppConfig::instance()->getWindowOpacity();
 
-  // Apply settings after dialog closes
-  applySettings();
+  // Connect immediate update signal for "Apply" button or live changes
+  connect(&dialog, &SettingsDialog::testOpacity, this, &MainWindow::setOpacity);
+
+  if (dialog.exec() == QDialog::Accepted) {
+    // Apply settings after dialog closes (already saved by dialog)
+    applySettings();
+  } else {
+    // Revert opacity if cancelled (and other visual settings if we live-updated
+    // them)
+    setOpacity(originalOpacity);
+  }
 
   // Ensure the main window is properly reactivated
   activateWindow();
@@ -528,7 +538,29 @@ void MainWindow::applyStartupTheme() {
   applyWebViewTheme(dark);
 }
 
-void MainWindow::setOpacity(int value) { setWindowOpacity(value / 100.0); }
+void MainWindow::setOpacity(int value) {
+  // Use Qt's method as baseline
+  setWindowOpacity(value / 100.0);
+
+#ifdef Q_OS_WIN
+  // Direct Windows API approach: SetLayeredWindowAttributes
+  // This bypasses any Qt caching and directly tells Windows to update the
+  // alpha.
+  HWND hwnd = (HWND)winId();
+  if (hwnd) {
+    // Ensure WS_EX_LAYERED style is set (should be, for frameless translucent
+    // windows)
+    LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
+    if (!(exStyle & WS_EX_LAYERED)) {
+      SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
+    }
+
+    // Set alpha directly: value is 0-100, Windows expects 0-255
+    BYTE alpha = static_cast<BYTE>((value * 255) / 100);
+    SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA);
+  }
+#endif
+}
 
 void MainWindow::onClipboardChanged(const QString &text) {
   if (AppConfig::instance()->getAutoTranslate() && !text.isEmpty()) {
