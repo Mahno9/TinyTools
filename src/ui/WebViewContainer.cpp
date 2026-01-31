@@ -46,6 +46,8 @@ WebViewContainer::WebViewContainer(QWidget *parent)
   settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
   settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
   settings->setAttribute(QWebEngineSettings::ShowScrollBars, false);
+  settings->setAttribute(QWebEngineSettings::JavascriptCanAccessClipboard,
+                         true);
 
   // Connect signals
   connect(page, &QWebEnginePage::loadFinished, this,
