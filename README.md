@@ -19,9 +19,9 @@ A versatile, lightweight desktop utility for Windows (10/11) that provides quick
 - Configure custom JavaScript to execute on load for each resource
 
 🎯 **Global Hotkeys**
-- **Main Toggle**: Toggle window visibility (Default: `Alt+Shift+T`)
-- **Alternative Toggle**: Open window and execute a secondary script (e.g., auto-translate clipboard) (Default: `Ctrl+Alt+Shift+T`)
-- **Resource-Specific Hotkeys**: Map unique hotkeys to open specific tools instantly (e.g., `Alt+G` for Google, `Alt+D` for DeepL)
+- **Main Toggle**: Toggle window visibility (Default: `Ctrl+Alt+T`)
+- **Alternative Toggle**: Open window and execute a secondary script (e.g., auto-translate clipboard) (Default: `Ctrl+Alt+S`)
+
 
 🪟 **Floating Overlay**
 - Always-on-top mode toggle
@@ -42,25 +42,18 @@ A versatile, lightweight desktop utility for Windows (10/11) that provides quick
 
 *Add screenshots here*
 
-## System Requirements
-
-- **OS**: Windows 10 or 11 (64-bit)
-- **RAM**: 512MB minimum, 2GB recommended
-- **Disk**: 50MB free space (+ Qt dependencies)
-- **Network**: Internet connection for web resources
-
 ## Usage
 
 ### Quick Start
 
 1. **Launch the application** - It will start in the system tray.
-2. **Press Alt+Shift+T** to show the overlay window.
+2. **Press Ctrl+Alt+T** to show the overlay window.
 3. **Add Resources**:
     - Click the "Gear" icon ⚙️ to open Settings.
     - Go to the "Resources" tab.
     - Click "Add Resource".
     - Enter a Name (e.g., "Google Translate") and URL (e.g., `https://translate.google.com`).
-    - (Optional) Configure "Open Script" to auto-paste text: `document.querySelector('textarea').value = '%1';`
+    - (Optional) Configure "Open Script" to auto-paste text: `document.querySelector('textarea').value = window.tinyToolsClipboard;`
     - Click "Apply".
 4. **Use Tabs**: Switch between tools using the tabs at the top or `Alt+1`, `Alt+2`.
 
@@ -68,10 +61,9 @@ A versatile, lightweight desktop utility for Windows (10/11) that provides quick
 
 | Shortcut | Action |
 |----------|--------|
-| `Alt+Shift+T` | Toggle Main Window (showing last used tab) |
-| `Ctrl+Alt+Shift+T` | Alternative Toggle (executes alternate JS logic) |
+| `Ctrl+Alt+T` | Toggle Main Window (showing last used tab) |
+| `Ctrl+Alt+S` | Alternative Toggle (executes alternate JS logic) |
 | `Alt+[1-9]` | Switch to Resource Tab 1-9 (when window is active) |
-| [Custom] | Resource-specific toggle (configured in Settings) |
 
 ## Configuration
 
@@ -84,10 +76,10 @@ Configuration is stored in `%APPDATA%\TinyTools\settings.json`.
   "resources": [
     {
       "id": "uuid-string",
-      "name": "Yandex.Translate",
-      "url": "https://translate.yandex.ru/",
-      "openScript": "const input = document.querySelector('#fakeArea'); if(input) { input.value = '%1'; input.dispatchEvent(new Event('input', { bubbles: true })); }",
-      "openHotkey": { "key": 89, "modifiers": 134217728 } // Alt+Y
+      "name": "Google Search",
+      "url": "https://google.com/",
+      "openScript": "{ const input = document.querySelector('input[name=\"q\"]'); if(input) { input.focus(); } }",
+      "altOpenScript": "{ const input = document.querySelector('input[name=\"q\"]'); if(input) { input.value = window.tinyToolsClipboard || ''; input.dispatchEvent(new Event('input', { bubbles: true })); } }"
     }
   ]
 }
@@ -121,3 +113,21 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Qt Framework** for the robust cross-platform UI engine.
 - **Yandex, Google, DeepL** and others for the web services we love to use.
+
+## Building with Docker
+
+This project includes a Docker configuration for building in a Windows container environment.
+Prerequisites: Windows with Containers enabled.
+
+1. Build the image:
+   ```powershell
+   docker-compose build
+   ```
+   *Note: This downloads approx. 15-20GB of data (Windows Server Core + VS Build Tools + Qt).*
+
+2. Run the build:
+   ```powershell
+   docker-compose run builder
+   ```
+
+The artifacts will be available in `build/Release/`.
