@@ -377,7 +377,31 @@ void MainWindow::loadCurrentResource() {
 // want to keep.
 
 void MainWindow::showAndActivate() {
+  if (isMinimized()) {
+    showNormal();
+  }
   show();
+
+#ifdef Q_OS_WIN
+  HWND hwnd = (HWND)winId();
+  if (hwnd) {
+    // Force window to foreground on Windows
+    // Requires attaching thread input if we are not the foreground process
+    DWORD currentThreadId = GetCurrentThreadId();
+    DWORD foregroundThreadId =
+        GetWindowThreadProcessId(GetForegroundWindow(), NULL);
+
+    if (currentThreadId != foregroundThreadId) {
+      AttachThreadInput(foregroundThreadId, currentThreadId, TRUE);
+      SetForegroundWindow(hwnd);
+      SetFocus(hwnd);
+      AttachThreadInput(foregroundThreadId, currentThreadId, FALSE);
+    } else {
+      SetForegroundWindow(hwnd);
+    }
+  }
+#endif
+
   raise();
   activateWindow();
 
@@ -385,6 +409,10 @@ void MainWindow::showAndActivate() {
   QScreen *screen = QGuiApplication::screenAt(pos());
   if (!screen)
     move(100, 100);
+
+  if (m_webView) {
+    m_webView->setFocus();
+  }
 }
 
 void MainWindow::insertClipboardText(bool useAltScript) {

@@ -3,6 +3,8 @@
 #include <QChildEvent>
 #include <QContextMenuEvent>
 #include <QDebug>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QWebEnginePage>
@@ -11,6 +13,38 @@
 #include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <QWheelEvent>
+
+// Custom QWebEnginePage to capture console logs
+class LoggingWebEnginePage : public QWebEnginePage {
+public:
+  explicit LoggingWebEnginePage(QWebEngineProfile *profile,
+                                QObject *parent = nullptr)
+      : QWebEnginePage(profile, parent) {}
+
+protected:
+  void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
+                                const QString &message, int lineNumber,
+                                const QString &sourceID) override {
+    QString levelStr;
+    switch (level) {
+    case InfoMessageLevel:
+      levelStr = "INFO";
+      break;
+    case WarningMessageLevel:
+      levelStr = "WARN";
+      break;
+    case ErrorMessageLevel:
+      levelStr = "ERROR";
+      break;
+    default:
+      levelStr = "LOG";
+      break;
+    }
+    qDebug().noquote() << QString("[JS][%1] %2 (%3:%4)")
+                              .arg(levelStr, message, sourceID,
+                                   QString::number(lineNumber));
+  }
+};
 
 // Static persistent profile shared across all WebViewContainers
 static QWebEngineProfile *getPersistentProfile() {
@@ -33,7 +67,7 @@ WebViewContainer::WebViewContainer(QWidget *parent)
     : QWebEngineView(parent), m_darkThemeEnabled(false),
       m_darkThemeApplied(false) {
   // Configure page with persistent profile for cookie/auth persistence
-  QWebEnginePage *page = new QWebEnginePage(getPersistentProfile(), this);
+  QWebEnginePage *page = new LoggingWebEnginePage(getPersistentProfile(), this);
   setPage(page);
 
   // Configure page settings for performance
@@ -46,6 +80,8 @@ WebViewContainer::WebViewContainer(QWidget *parent)
   settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
   settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
   settings->setAttribute(QWebEngineSettings::ShowScrollBars, false);
+  // Keep this enabled just in case user scripts rely on it for other things,
+  // though we are bypassing it for clipboard READ.
   settings->setAttribute(QWebEngineSettings::JavascriptCanAccessClipboard,
                          true);
 
@@ -56,10 +92,6 @@ WebViewContainer::WebViewContainer(QWidget *parent)
           &WebViewContainer::onLoadProgress);
   connect(page, &QWebEnginePage::renderProcessTerminated, this,
           &WebViewContainer::onRenderProcessTerminated);
-
-  // Initial load blank or default?
-  // We wait for loadResource to be called.
-  // load(QUrl("about:blank"));
 
   // Install event filter on focus proxy to catch wheel events
   if (focusProxy()) {
@@ -106,7 +138,7 @@ void WebViewContainer::insertText(const QString &text) {
     return;
   }
 
-  // Get fresh script from ResourceManager (in case it was updated in settings)
+  // Get fresh script from ResourceManager
   WebResource resource =
       ResourceManager::instance()->getResourceById(m_resourceId);
   QString openScript = resource.isValid() ? resource.openScript : m_openScript;
@@ -116,20 +148,21 @@ void WebViewContainer::insertText(const QString &text) {
     return;
   }
 
-  // Replace %1 with escaped text
-  QString safeText = text;
-  safeText.replace("\\", "\\\\");
-  safeText.replace("'", "\\'");
-  safeText.replace("\"", "\\\"");
-  safeText.replace("\n", "\\n");
-  safeText.replace("\r", "");
-
-  QString script = openScript;
-  script.replace("%1", safeText);
-  script.replace("%CLIPBOARD%", safeText);
-
   qDebug() << "Executing open script with text length:" << text.length();
-  injectJavaScript(script);
+
+  // Safely escape the text by wrapping in a JSON array
+  QJsonArray jsonArray;
+  jsonArray.append(text);
+  QString safeJson = QJsonDocument(jsonArray).toJson(QJsonDocument::Compact);
+
+  // Inject the text into a global variable first
+  QString code = QString("window.tinyToolsClipboard = %1[0];").arg(safeJson);
+
+  // Execute variable injection, then user script
+  // We use a lambda callback to ensure sequential execution
+  page()->runJavaScript(code, [this, openScript](const QVariant &) {
+    injectJavaScript(openScript);
+  });
 }
 
 void WebViewContainer::insertAltText(const QString &text) {
@@ -138,7 +171,7 @@ void WebViewContainer::insertAltText(const QString &text) {
     return;
   }
 
-  // Get fresh script from ResourceManager (in case it was updated in settings)
+  // Get fresh script from ResourceManager
   WebResource resource =
       ResourceManager::instance()->getResourceById(m_resourceId);
   QString altScript =
@@ -149,20 +182,18 @@ void WebViewContainer::insertAltText(const QString &text) {
     return;
   }
 
-  QString safeText = text;
-  safeText.replace("\\", "\\\\");
-  safeText.replace("'", "\\'");
-  safeText.replace("\"", "\\\"");
-  safeText.replace("\n", "\\n");
-  safeText.replace("\r", "");
-
-  QString script = altScript;
-  script.replace("%1", safeText);
-  script.replace("%CLIPBOARD%", safeText);
-
   qDebug() << "Executing alternative open script with text length:"
            << text.length();
-  injectJavaScript(script);
+
+  // Same logic for Alt script
+  QJsonArray jsonArray;
+  jsonArray.append(text);
+  QString safeJson = QJsonDocument(jsonArray).toJson(QJsonDocument::Compact);
+  QString code = QString("window.tinyToolsClipboard = %1[0];").arg(safeJson);
+
+  page()->runJavaScript(code, [this, altScript](const QVariant &) {
+    injectJavaScript(altScript);
+  });
 }
 
 void WebViewContainer::reloadTranslator() { reload(); }
