@@ -1,7 +1,7 @@
 # escape=`
 
 # Use Windows Server Core 2022 as the base image
-FROM mcr.microsoft.com/windows/servercore:ltsc2019
+FROM mcr.microsoft.com/windows/servercore:ltsc2022
 
 # Restore the default Windows shell for correct batch processing.
 SHELL ["cmd", "/S", "/C"]
@@ -24,7 +24,7 @@ RUN C:\TEMP\vs_buildtools.exe --quiet --wait --norestart --nocache `
 
 # Install Chocolatey for package management
 # Pin to 1.4.0 as it is the last version supporting .NET 4.5 by default
-# (Windows Server Core 2019 comes with .NET 4.7.2, but newer choco needs 4.8)
+# (Windows Server Core 2022 comes with .NET 4.8)
 ENV chocolateyVersion=1.4.0
 RUN powershell -NoProfile -ExecutionPolicy Bypass -Command `
     "iex ((New-Object System.Net.WebClient).DownloadString('https://chocolatey.org/install.ps1'))"

@@ -13,18 +13,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # We use the docker-compose to build.
-      # Note: GitHub Actions Windows runners support Docker.
-      - name: Build Image
-        run: docker compose build builder
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
 
-      - name: Run Build
-        run: docker compose run builder
+      - name: Install aqtinstall
+        run: pip install aqtinstall
+
+      - name: Install Qt
+        shell: cmd
+        run: |
+          if not exist C:\Qt mkdir C:\Qt
+          python -m aqt install-qt windows desktop 6.3.0 win64_msvc2019_64 --outputdir C:\Qt --modules qtwebengine qtwebchannel qtpositioning
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Build Application
+        shell: cmd
+        run: .\build.bat
 
       - name: List Build Output
-        run: dir build/Release
+        run: dir build\Release\bin
 
-      # Upload the artifacts
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
