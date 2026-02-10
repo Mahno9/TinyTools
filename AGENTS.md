@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance for agentic coding assistants working on the YandexTranslator C++/Qt project.
+This file provides guidance for agentic coding assistants working on the TinyTools C++/Qt project.
 
 ## Build Commands
 
@@ -25,7 +25,7 @@ rm -rf CMakeCache.txt CMakeFiles
 ### Deploy Qt dependencies
 ```bash
 cd build/Release
-windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw YandexTranslator.exe
+windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw TinyTools.exe
 ```
 
 ## Testing
@@ -100,7 +100,7 @@ connect(sender, &Sender::signal, receiver, &Receiver::slot, Qt::UniqueConnection
 - Check return values and handle failures gracefully
 
 ### Constants and Configuration
-Define constants in `src/app/Constants.h` using `constexpr`. Use `QSettings` for config persistence. Store config in `%APPDATA%\YandexTranslator\settings.json`.
+Define constants in `src/app/Constants.h` using `constexpr`. Use `QSettings` for config persistence. Store config in `%APPDATA%\TinyTools\settings.json`.
 
 ### Formatting
 - 4-space indentation (no tabs)
@@ -139,7 +139,7 @@ Use `#ifdef _WIN32` for Windows, `#ifdef __linux__` for Linux. Keep platform imp
 2. Build: `cmake --build . --config Release`
 3. Run tests: `ctest --config Release --output-on-failure`
 4. Test manually if needed
-5. Deploy: `windeployqt YandexTranslator.exe`
+5. Deploy: `windeployqt TinyTools.exe`
 
 ## No Lint/Typecheck Configured
 Rely on compiler warnings, Qt Creator's code analysis, and manual code review.

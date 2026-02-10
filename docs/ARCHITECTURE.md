@@ -12,8 +12,8 @@
 
 ## Architecture Principles
 
-1.  **Multi-Resource Support**: The core architectural shift from "YandexTranslator" to "TinyTools" is the `WebResource` model, allowing $N$ configuratble tools instead of one hardcoded URL.
-2.  **Singleton resource Management**: A central `ResourceManager` handles persistence, CRUD operations, and resource ordering.
+1.  **Multi-Resource Support**: The core architectural concept is the `WebResource` model, allowing $N$ configuratble tools.
+2.  **Singleton Resource Management**: A central `ResourceManager` handles persistence, CRUD operations, and resource ordering.
 3.  **Low Latency**: The `WebViewContainer` is kept alive (or lazily loaded) to ensure instant visibility upon hotkey press.
 4.  **Extensible Hotkey System**: A generalized `HotkeyManager` supports registering dynamic keys for each resource.
 

@@ -103,7 +103,7 @@ TinyTools/
 
 ### Build Instructions
 
-See [BUILD.md](plans/BUILD.md) for detailed build instructions using CMake and Qt 6.
+See [BUILD.md](docs/BUILD.md) for detailed build instructions using CMake and Qt 6.
 
 ## License
 

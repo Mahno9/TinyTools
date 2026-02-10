@@ -9,6 +9,7 @@ cmake_install.cmake
 Makefile
 *.cmake
 !CMakeLists.txt
+CMakeLists.txt.user
 
 # Qt
 *.o
@@ -75,3 +76,7 @@ tmp/
 temp/
 *.tmp
 *.temp
+
+# Agent
+.agent/
+task.md

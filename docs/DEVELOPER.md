@@ -1,6 +1,6 @@
 # Developer Guide
 
-This guide provides detailed information for developers working on the Yandex Translator Desktop application.
+This guide provides detailed information for developers working on the TinyTools application.
 
 ## Table of Contents
 
@@ -147,7 +147,7 @@ disconnect(m_clipboardManager, &ClipboardManager::clipboardChanged,
 
 ```cpp
 // Use QSettings for configuration
-QSettings settings("YandexTranslator", "App");
+QSettings settings("TinyTools", "App");
 int opacity = settings.value("window/opacity", 90).toInt();
 
 // Clean up resources
@@ -218,7 +218,7 @@ WebViewContainer::insertText()
     ↓
 JavaScript Injection (DOM manipulation)
     ↓
-Yandex Translate Server
+Web Resource (e.g. Google Translate)
     ↓
 Translation Result (WebPage)
 ```
@@ -297,31 +297,6 @@ void Application::initialize() {
 }
 ```
 
-### Example: Adding a New Signal
-
-```cpp
-// 1. Declare signal in class header
-signals:
-    void newFeatureActivated(const QString& data);
-
-// 2. Emit signal when appropriate
-void MyClass::triggerFeature() {
-    QString data = prepareData();
-    emit newFeatureActivated(data);
-}
-
-// 3. Connect to signal in application setup
-void Application::connectSignals() {
-    connect(m_feature, &Feature::newFeatureActivated,
-            this, &Application::onNewFeatureActivated);
-}
-
-// 4. Handle signal
-void Application::onNewFeatureActivated(const QString& data) {
-    qInfo() << "Feature activated with data:" << data;
-}
-```
-
 ## Testing Guide
 
 ### Unit Tests
@@ -386,45 +361,15 @@ ctest --config Release --output-on-failure
 ctest -V
 ```
 
-### Integration Tests
-
-#### Testing WebView Integration
-
-```cpp
-// tests/integration/test_webview.cpp
-class TestWebView : public QObject {
-    Q_OBJECT
-    
-private slots:
-    void testTextInjection();
-};
-
-void TestWebView::testTextInjection() {
-    WebViewContainer webView;
-    QSignalSpy spy(&webView, &WebViewContainer::pageLoaded);
-    
-    // Wait for page load
-    QVERIFY(spy.wait(10000));
-    QVERIFY(spy.takeFirst().at(0).toBool());
-    
-    // Test text injection
-    webView.insertText("Test text");
-    
-    // Verify injection (use JavaScript to check)
-    QSignalSpy jsSpy(webView.page(), &QWebEnginePage::javaScriptConsoleMessage);
-    // ...
-}
-```
-
 ## Debugging
 
 ### Logging Strategy
 
 ```cpp
 // Use Qt's logging categories
-Q_LOGGING_CATEGORY(appLog, "yandex.app")
-Q_LOGGING_CATEGORY(webViewLog, "yandex.webview")
-Q_LOGGING_CATEGORY(clipboardLog, "yandex.clipboard")
+Q_LOGGING_CATEGORY(appLog, "tinytools.app")
+Q_LOGGING_CATEGORY(webViewLog, "tinytools.webview")
+Q_LOGGING_CATEGORY(clipboardLog, "tinytools.clipboard")
 
 // In code
 qCDebug(appLog) << "Application initialized";
@@ -437,111 +382,9 @@ qCCritical(clipboardLog) << "Clipboard access error";
 ```cpp
 // In main.cpp
 QLoggingCategory::setFilterRules(
-    "yandex.*.debug=true\n"
+    "tinytools.*.debug=true\n"
     "qt.webengine*.debug=false"
 );
-```
-
-### Common Debugging Techniques
-
-#### 1. Breakpoints in Qt Creator
-
-1. Set breakpoint by clicking on line number
-2. Start debugger (F5)
-3. Inspect variables in "Locals and Expressions" view
-4. Use "Step Over" (F10) and "Step Into" (F11)
-
-#### 2. qDebug() Output
-
-```cpp
-void MyClass::processData(const QString& data) {
-    qDebug() << "Processing data:" << data;
-    qDebug() << "Data length:" << data.length();
-    qDebug() << "First 50 chars:" << data.left(50);
-    
-    // Process...
-}
-```
-
-#### 3. QSignalSpy for Testing
-
-```cpp
-void testSignalEmission() {
-    MyClass obj;
-    QSignalSpy spy(&obj, &MyClass::mySignal);
-    
-    obj.triggerSignal();
-    
-    QCOMPARE(spy.count(), 1);
-    QList<QVariant> arguments = spy.takeFirst();
-    QCOMPARE(arguments.at(0).toString(), QString("expected"));
-}
-```
-
-#### 4. WebView Debugging
-
-```cpp
-// Enable remote debugging
-qputenv("QTWEBENGINE_REMOTE_DEBUGGING", "12345");
-
-// Open Chrome to: chrome://inspect
-// Navigate to the target page
-```
-
-### Common Issues and Solutions
-
-#### Issue: Signal Not Connected
-
-**Symptoms:** Slot never called
-
-**Solution:**
-```cpp
-// Check connection return value
-bool connected = connect(sender, &Sender::signal, receiver, &Receiver::slot);
-qDebug() << "Connection result:" << connected;
-
-// Use Qt::UniqueConnection to avoid duplicates
-connect(sender, &Sender::signal, receiver, &Receiver::slot, Qt::UniqueConnection);
-```
-
-#### Issue: Memory Leak
-
-**Symptoms:** Increasing memory usage
-
-**Solution:**
-```cpp
-// Use QPointer for QObject children
-QPointer<QWidget> widget = new QWidget(parent);
-
-// Delete when done
-widget->deleteLater();
-
-// Check with Qt Creator's Valgrind integration
-// Tools > Valgrind Memory Analyzer
-```
-
-#### Issue: WebView Not Loading
-
-**Symptoms:** White screen or error
-
-**Solution:**
-```cpp
-// Check page load status
-connect(page, &QWebEnginePage::loadFinished, [](bool ok) {
-    qDebug() << "Page load finished:" << ok;
-});
-
-// Check URL
-qDebug() << "Loading URL:" << webView->url().toString();
-
-// Inspect console messages
-connect(page, &QWebEnginePage::javaScriptConsoleMessage,
-        [](QWebEnginePage::JavaScriptConsoleMessageLevel level,
-           const QString& message,
-           int lineNumber,
-           const QString& sourceID) {
-    qDebug() << "JS Console:" << level << message << lineNumber;
-});
 ```
 
 ## Performance Optimization
@@ -559,97 +402,8 @@ void optimizeWebView() {
     // Disable unused features
     settings->setAttribute(QWebEngineSettings::WebGLEnabled, false);
     settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
-    settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
     
     // Optimize for text
     settings->setAttribute(QWebEngineSettings::PluginsEnabled, false);
-    settings->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
 }
 ```
-
-### Clipboard Performance
-
-```cpp
-// Debounce clipboard changes
-class ClipboardManager {
-    QTimer* m_debounceTimer;
-    
-public:
-    ClipboardManager(QObject* parent) : QObject(parent) {
-        m_debounceTimer = new QTimer(this);
-        m_debounceTimer->setSingleShot(true);
-        m_debounceTimer->setInterval(500);
-        
-        connect(m_debounceTimer, &QTimer::timeout, [this]() {
-            emit clipboardChanged(getText());
-        });
-        
-        connect(m_clipboard, &QClipboard::dataChanged, [this]() {
-            m_debounceTimer->start(); // Restart timer
-        });
-    }
-};
-```
-
-### Memory Optimization
-
-```cpp
-// Clean up WebView when hidden
-void MainWindow::hideEvent(QHideEvent* event) {
-    if (m_webView) {
-        // Release WebView resources
-        m_webView->stop();
-        m_webView->setUrl(QUrl("about:blank"));
-    }
-    QMainWindow::hideEvent(event);
-}
-
-// Rebuild WebView when shown
-void MainWindow::showEvent(QShowEvent* event) {
-    if (m_webView && m_webView->url().isEmpty()) {
-        m_webView->load(QUrl("https://translate.yandex.ru/"));
-    }
-    QMainWindow::showEvent(event);
-}
-```
-
-## Code Review Checklist
-
-Before submitting code, ensure:
-
-- [ ] Code compiles without warnings
-- [ ] Unit tests pass
-- [ ] Memory leaks are absent (use Valgrind or similar)
-- [ ] Signals are properly connected and disconnected
-- [ ] Resources are cleaned up in destructors
-- [ ] Error handling is comprehensive
-- [ ] Logging is appropriate (not too verbose, not too sparse)
-- [ ] Comments are clear and necessary
-- [ ] Naming conventions are followed
-- [ ] Code is formatted consistently
-
-## Contributing Guidelines
-
-1. **Fork the repository**
-2. **Create a feature branch** (`git checkout -b feature/amazing-feature`)
-3. **Make your changes** following coding standards
-4. **Write tests** for new functionality
-5. **Update documentation** if needed
-6. **Commit with clear messages**
-   ```
-   Add: Feature description
-   - Implemented X
-   - Fixed Y
-   ```
-7. **Push and create Pull Request**
-
-## Additional Resources
-
-- [Qt Documentation](https://doc.qt.io/)
-- [C++ Core Guidelines](https://isocpp.github.io/CppCoreGuidelines/)
-- [Effective Modern C++](http://www.aristeia.com/books.html) by Scott Meyers
-- [Qt Best Practices](https://wiki.qt.io/Qt_Project_Guidelines)
-
----
-
-Happy coding! 💻

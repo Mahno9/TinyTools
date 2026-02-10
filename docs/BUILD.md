@@ -1,6 +1,6 @@
 # Build Instructions
 
-This document provides detailed instructions for building the Yandex Translator Desktop application from source.
+This document provides detailed instructions for building the TinyTools application from source.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ This document provides detailed instructions for building the Yandex Translator 
 1. **Qt 6.x** (6.2 or later recommended)
    - Download from: https://www.qt.io/download
    - Install: Qt 6.x with the following components:
-     - Qt 6.x (MSVC 2019 64-bit)
+     - Qt 6.x (MSVC 2019/2022 64-bit)
      - Qt WebEngine
      - Qt WebChannel
      - Additional Libraries: Qt Network, Qt Core, Qt Gui, Qt Widgets
@@ -59,8 +59,8 @@ This document provides detailed instructions for building the Yandex Translator 
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/YandexTranslator.git
-cd YandexTranslator
+git clone https://github.com/yourusername/TinyTools.git
+cd TinyTools
 ```
 
 ### Step 2: Create Build Directory
@@ -109,7 +109,7 @@ cmake --build . --config Release
 
 #### Using Visual Studio IDE:
 
-1. Open `build/YandexTranslator.sln`
+1. Open `build/TinyTools.sln`
 2. Select "Release" configuration
 3. Build → Build Solution (Ctrl+Shift+B)
 
@@ -117,7 +117,7 @@ cmake --build . --config Release
 
 ```bash
 cd Release
-YandexTranslator.exe
+TinyTools.exe
 ```
 
 Or from Visual Studio: Press F5 to run with debugger.
@@ -130,7 +130,7 @@ Use `windeployqt` to bundle all required Qt libraries:
 
 ```bash
 cd build/Release
-windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw YandexTranslator.exe
+windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw TinyTools.exe
 ```
 
 ### Step 2: Test the Deployment
@@ -138,7 +138,7 @@ windeployqt --release --no-translations --no-system-d3d-compiler --no-opengl-sw 
 Run the executable to ensure all dependencies are included:
 
 ```bash
-YandexTranslator.exe
+TinyTools.exe
 ```
 
 ### Step 3: Create Distribution Package
@@ -146,7 +146,7 @@ YandexTranslator.exe
 Create a ZIP archive of the Release directory:
 
 ```powershell
-Compress-Archive -Path Release\* -DestinationPath YandexTranslator-Windows-x64.zip
+Compress-Archive -Path Release\* -DestinationPath TinyTools-Windows-x64.zip
 ```
 
 ### Step 4: Create Installer (Optional)
@@ -158,11 +158,11 @@ Compress-Archive -Path Release\* -DestinationPath YandexTranslator-Windows-x64.z
 
 ```iss
 [Setup]
-AppName=Yandex Translator
+AppName=TinyTools
 AppVersion=1.0.0
-DefaultDirName={pf}\YandexTranslator
-DefaultGroupName=Yandex Translator
-OutputBaseFilename=YandexTranslator-Setup
+DefaultDirName={pf}\TinyTools
+DefaultGroupName=TinyTools
+OutputBaseFilename=TinyTools-Setup
 Compression=lzma
 SolidCompression=yes
 
@@ -170,11 +170,11 @@ SolidCompression=yes
 Source: "build\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{group}\Yandex Translator"; Filename: "{app}\YandexTranslator.exe"
-Name: "{commondesktop}\Yandex Translator"; Filename: "{app}\YandexTranslator.exe"
+Name: "{group}\TinyTools"; Filename: "{app}\TinyTools.exe"
+Name: "{commondesktop}\TinyTools"; Filename: "{app}\TinyTools.exe"
 
 [Run]
-Filename: "{app}\YandexTranslator.exe"; Description: "Launch Yandex Translator"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\TinyTools.exe"; Description: "Launch TinyTools"; Flags: nowait postinstall skipifsilent
 ```
 
 3. Compile the installer:
@@ -189,9 +189,9 @@ iscc installer.iss
 2. Create `installer.nsi`:
 
 ```nsis
-!define APP_NAME "Yandex Translator"
+!define APP_NAME "TinyTools"
 !define APP_VERSION "1.0.0"
-!define APP_EXE "YandexTranslator.exe"
+!define APP_EXE "TinyTools.exe"
 
 Name "${APP_NAME}"
 OutFile "${APP_NAME}-${APP_VERSION}-Setup.exe"
@@ -252,16 +252,6 @@ cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
 cmake --build . --config RelWithDebInfo
 ```
 
-### Minimal Build (Smaller Size)
-
-Modify `CMakeLists.txt`:
-
-```cmake
-# Add before project()
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /MT /O2 /GL")
-set(CMAKE_EXE_LINKER_FLAGS_RELEASE "${CMAKE_EXE_LINKER_FLAGS_RELEASE} /LTCG")
-```
-
 ## Common Build Issues
 
 ### Issue: Qt Not Found
@@ -276,16 +266,6 @@ Could not find Qt6
 set CMAKE_PREFIX_PATH=C:\Qt\6.3.0\msvc2019_64
 cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
 ```
-
-### Issue: CMake Version Too Old
-
-**Error:**
-```
-CMake 3.16 or higher is required
-```
-
-**Solution:**
-Install CMake 3.16+ from https://cmake.org/download/
 
 ### Issue: Visual Studio Not Found
 
@@ -318,135 +298,9 @@ cmake -G "Visual Studio 16 2019" -A x64 ..
 cmake --build . --config Release
 ```
 
-## Code Signing (Optional)
-
-To sign your application with a code signing certificate:
-
-### Using signtool (Windows SDK):
-
-```bash
-signtool sign /f certificate.pfx /p password /t http://timestamp.digicert.com build\Release\YandexTranslator.exe
-```
-
-### Using osslsigncode (cross-platform):
-
-```bash
-osslsigncode sign -certs certificate.pem -key key.pem -n "Yandex Translator" \
-  -i https://github.com/yourusername/YandexTranslator \
-  -t http://timestamp.digicert.com \
-  -in build/Release/YandexTranslator.exe -out build/Release/YandexTranslator-signed.exe
-```
-
-## Continuous Integration
-
-### GitHub Actions Example
-
-Create `.github/workflows/build.yml`:
-
-```yaml
-name: Build Windows
-
-on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  build:
-    runs-on: windows-latest
-    
-    steps:
-    - uses: actions/checkout@v3
-    
-    - name: Install Qt
-      uses: jurplel/install-qt-action@v3
-      with:
-        version: '6.3.0'
-        host: 'windows'
-        target: 'desktop'
-        arch: 'win64_msvc2019_64'
-        
-    - name: Configure CMake
-      run: |
-        cmake -B build -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="${{ steps.install-qt.outputs.qtDir }}"
-        
-    - name: Build
-      run: cmake --build build --config Release
-      
-    - name: Deploy Qt
-      run: windeployqt --release build/Release/YandexTranslator.exe
-      
-    - name: Create Archive
-      run: Compress-Archive -Path build/Release/* -DestinationPath YandexTranslator-Windows-x64.zip
-      
-    - name: Upload Artifact
-      uses: actions/upload-artifact@v3
-      with:
-        name: YandexTranslator-Windows-x64
-        path: YandexTranslator-Windows-x64.zip
-```
-
-## Testing
-
-### Run Unit Tests
-
-```bash
-cd build/tests
-ctest --config Release --output-on-failure
-```
-
-### Run Specific Test
-
-```bash
-cd build/tests
-./unit/test_clipboard.exe
-```
-
-## Performance Profiling
-
-### Using Visual Studio Profiler
-
-1. Open project in Visual Studio
-2. Analyze → Performance Profiler
-3. Select "CPU Usage" or "Memory Usage"
-4. Run the application and perform actions
-5. Analyze the results
-
-### Using QElapsedTimer
-
-```cpp
-#include <QElapsedTimer>
-
-QElapsedTimer timer;
-timer.start();
-
-// Your code here
-
-qDebug() << "Operation took:" << timer.elapsed() << "ms";
-```
-
-## Additional Resources
-
-- [Qt Documentation](https://doc.qt.io/)
-- [CMake Documentation](https://cmake.org/documentation/)
-- [Qt WebEngine Documentation](https://doc.qt.io/qt-6/qtwebengine-index.html)
-- [windeployqt Documentation](https://doc.qt.io/qt-6/deploy-windows.html)
-
 ## Support
 
 If you encounter build issues not covered here:
 
-1. Check the [Troubleshooting section](README.md#troubleshooting)
-2. Search existing [GitHub Issues](https://github.com/yourusername/YandexTranslator/issues)
-3. Create a new issue with:
-   - Your OS version
-   - Qt version
-   - CMake version
-   - Compiler version
-   - Full error message
-   - Steps to reproduce
-
----
-
-Happy building! 🚀
+1. Check the [Troubleshooting section](../README.md#troubleshooting)
+2. Search existing Issues
