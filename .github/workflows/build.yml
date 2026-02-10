@@ -1,0 +1,32 @@
+name: Build Application
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+      - uses: actions/checkout@v3
+
+      # We use the docker-compose to build.
+      # Note: GitHub Actions Windows runners support Docker.
+      - name: Build Image
+        run: docker-compose build builder
+
+      - name: Run Build
+        run: docker-compose run builder
+
+      - name: List Build Output
+        run: dir build/Release
+
+      # Upload the artifacts
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: TinyTools-Release
+          path: build/Release/bin/

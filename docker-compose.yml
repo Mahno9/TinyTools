@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ./:C:/app
+    # We allocate 4GB of RAM to the container (default might be too low for C++ builds) if using Hyper-V isolation,
+    # but process isolation is default on Windows Server/Desktop if versions match.
+    # Increasing shared memory can help.
+    command: C:\build.bat
