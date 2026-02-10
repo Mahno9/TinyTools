@@ -5,6 +5,7 @@ A versatile, lightweight desktop utility for Windows (10/11) that provides quick
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-lightgrey.svg)
 ![Qt](https://img.shields.io/badge/Qt-6.x-green.svg)
+[![Build Application](https://github.com/Mahno9/TinyTools/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/Mahno9/TinyTools/actions/workflows/build.yml)
 
 ## Features
 
