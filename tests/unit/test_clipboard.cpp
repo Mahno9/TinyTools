@@ -1,4 +1,6 @@
 #include <QtTest>
+#include <QClipboard>
+#include <QGuiApplication>
 #include "../../src/core/ClipboardManager.h"
 
 class TestClipboard : public QObject {
@@ -12,6 +14,7 @@ private slots:
 };
 
 void TestClipboard::testGetEmptyText() {
+    QGuiApplication::clipboard()->clear();
     ClipboardManager manager;
     QVERIFY(manager.getText().isEmpty());
 }
