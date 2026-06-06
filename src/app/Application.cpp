@@ -19,7 +19,12 @@ Application::Application(QObject *parent) : QObject(parent) {
 
 Application::~Application() {
   qDebug() << "Application::~Application() - ENTRY";
-  qDebug() << "Application instance destroyed - cleanup handled by QPointer";
+  // Delete MainWindow first: its WebViewContainers/QWebEnginePages must be gone
+  // before QApplication (later) destroys the WebEngine profile (its child).
+  delete m_mainWindow.data();
+  // Explicitly delete singletons while QApplication is still alive.
+  ResourceManager::cleanupInstance();
+  AppConfig::cleanupInstance();
   qDebug() << "Application::~Application() - EXIT";
 }
 

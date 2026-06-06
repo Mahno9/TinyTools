@@ -33,7 +33,7 @@ constexpr int DEFAULT_HOTKEY_MODIFIER_CTRL = 0x0002;
 constexpr int DEFAULT_HOTKEY_MODIFIER_ALT = 0x0001;
 
 // Clipboard Settings
-constexpr int MAX_CLIPBOARD_TEXT_LENGTH = 10000000; // 10MB limit
+constexpr int MAX_CLIPBOARD_TEXT_LENGTH = 100000; // 100KB limit
 constexpr int DEFAULT_CLIPBOARD_TRIM_LENGTH = 10000;
 
 // WebView Settings

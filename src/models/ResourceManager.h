@@ -30,6 +30,7 @@ public:
      * @brief Get the singleton instance
      */
     static ResourceManager* instance();
+    static void cleanupInstance();
     
     // Resource CRUD operations
     QList<WebResource> getAllResources() const;

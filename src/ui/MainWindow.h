@@ -2,6 +2,7 @@
 #include <QMainWindow>
 #include <QMap>
 #include <QPointer>
+#include <QTimer>
 
 class WebViewContainer;
 class ClipboardManager;
@@ -69,15 +70,15 @@ private:
 
   QPointer<ClipboardManager> m_clipboardManager;
 
-  QWidget *m_dragHandle;
-  QStackedWidget *m_stackedWidget;
+  QWidget *m_dragHandle = nullptr;
+  QStackedWidget *m_stackedWidget = nullptr;
   QMap<QString, WebViewContainer *> m_resourceViews;
   WebViewContainer *m_webView = nullptr;
 
-  QPushButton *m_settingsButton;
-  QPushButton *m_closeButton;
-  QPushButton *m_minimizeButton;
-  QTabBar *m_tabBar;
+  QPushButton *m_settingsButton = nullptr;
+  QPushButton *m_closeButton = nullptr;
+  QPushButton *m_minimizeButton = nullptr;
+  QTabBar *m_tabBar = nullptr;
 
   QPoint m_dragPosition;
   bool m_dragging;
@@ -87,7 +88,8 @@ private:
   QList<QString> m_tabResourceIds;
   QString m_currentResourceId;
 
-  QAction *m_refreshAction;
+  QAction *m_refreshAction = nullptr;
+  QTimer *m_zoomSaveTimer = nullptr;
 
   static constexpr int DEFAULT_WIDTH = 800;
   static constexpr int DEFAULT_HEIGHT = 600;

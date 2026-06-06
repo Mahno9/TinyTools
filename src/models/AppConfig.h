@@ -17,7 +17,8 @@ class AppConfig : public QObject {
 
 public:
     static AppConfig* instance();
-    
+    static void cleanupInstance();
+
     bool load();
     bool save();
     void resetToDefaults();

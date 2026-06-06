@@ -37,7 +37,6 @@ public:
   QString getResourceId() const { return m_resourceId; }
 
 private:
-private:
   void injectJavaScript(const QString &script);
   void waitForPageLoad();
 

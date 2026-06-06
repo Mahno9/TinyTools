@@ -1,5 +1,6 @@
 #include "ResourceManager.h"
 #include "AppConfig.h"
+#include "../app/Constants.h"
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonArray>
@@ -18,6 +19,12 @@ ResourceManager* ResourceManager::instance() {
         s_instance = new ResourceManager();
     }
     return s_instance;
+}
+
+void ResourceManager::cleanupInstance() {
+    QMutexLocker locker(&s_mutex);
+    delete s_instance.data();
+    s_instance = nullptr;
 }
 
 ResourceManager::ResourceManager()
@@ -233,16 +240,24 @@ bool ResourceManager::importPresets(const QString& filePath) {
     int importedCount = 0;
     
     for (const QJsonValue& value : resourcesArray) {
+        if (m_resources.size() >= Constants::MAX_RESOURCES) {
+            qWarning() << "Import cap reached at" << Constants::MAX_RESOURCES << "resources — skipping remainder";
+            break;
+        }
+
         WebResource resource = WebResource::fromJson(value.toObject());
-        
+
         // Generate new ID to avoid conflicts (append mode)
         resource.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
         resource.order = m_resources.size(); // Add at end
-        
+
+        // isValid() enforces http/https scheme — rejects file:// and javascript: URLs
         if (resource.isValid()) {
             m_resources.append(resource);
             emit resourceAdded(resource.id);
             importedCount++;
+        } else {
+            qWarning() << "Skipping imported resource with invalid URL:" << resource.url;
         }
     }
     

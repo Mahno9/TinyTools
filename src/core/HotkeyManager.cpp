@@ -1,6 +1,5 @@
 #include "HotkeyManager.h"
 #include <QApplication>
-#include <QWidget>
 #include <QDebug>
 
 #ifdef _WIN32
@@ -46,34 +45,6 @@ HotkeyManager::~HotkeyManager() {
     qDebug() << "HotkeyManager::~HotkeyManager() - EXIT";
 }
 
-void* HotkeyManager::getMainWindowHandle() {
-    qDebug() << "Getting main window handle...";
-    
-#ifdef _WIN32
-    // Try to get MainWindow specifically, not just any active window
-    QWidgetList topLevelWidgets = QApplication::topLevelWidgets();
-    for (QWidget* widget : topLevelWidgets) {
-        if (widget->objectName() == "MainWindow" || widget->inherits("MainWindow")) {
-            void* hwnd = (void*)widget->winId();
-            qDebug() << "MainWindow handle found:" << hwnd;
-            return hwnd;
-        }
-    }
-    
-    // Fallback to active window if MainWindow not found
-    if (qApp && qApp->activeWindow()) {
-        void* hwnd = (void*)qApp->activeWindow()->winId();
-        qDebug() << "Active window handle (fallback):" << hwnd;
-        return hwnd;
-    }
-    
-    qWarning() << "No window found - using null window handle";
-    qDebug() << "Returning null window handle";
-    return nullptr;
-#else
-    return nullptr;
-#endif
-}
 
 bool HotkeyManager::unregisterHotkeyInternal(const HotkeyManager::HotkeyData& hotkey) {
     qDebug() << "HotkeyManager::unregisterHotkeyInternal() - ENTRY";
@@ -188,9 +159,11 @@ bool HotkeyManager::registerHotkey(HotkeyType::Type type, int key, Qt::KeyboardM
     qDebug() << "Final modifiersCode: 0x" << QString::number(modifiersCode, 16) << "(decimal:" << modifiersCode << ")";
     qDebug() << "Expected flags for Alt+Ctrl: 0x" << QString::number(MOD_ALT | MOD_CONTROL, 16);
     
-    // Get and store window handle
-    hotkey.windowHandle = getMainWindowHandle();
-    qDebug() << "Window handle for registration:" << hotkey.windowHandle;
+    // Use NULL HWND: thread-associated hotkey — WM_HOTKEY is posted to the UI
+    // thread's message queue regardless of which window is active, which is
+    // more reliable than binding to a specific (potentially transient) HWND.
+    hotkey.windowHandle = nullptr;
+    qDebug() << "Window handle for registration: NULL (thread-associated)";
     
     // Register hotkey with Windows
     hotkey.id = ++s_hotkeyIdCounter;
@@ -235,60 +208,10 @@ bool HotkeyManager::registerHotkey(HotkeyType::Type type, int key, Qt::KeyboardM
         return true;
     } else {
         DWORD error = GetLastError();
-        qCritical() << "=== REGISTERHOTKEY FAILED ===";
-        qCritical() << "Windows error code:" << error;
-        qCritical() << "Error code in hex: 0x" << QString::number(error, 16);
-        
-        // Detailed error descriptions
-        switch (error) {
-            case 1409: // ERROR_HOTKEY_ALREADY_REGISTERED
-                qCritical() << "ERROR_HOTKEY_ALREADY_REGISTERED (1409) - Hotkey already registered by this or another application";
-                qCritical() << "You may need to restart the application to clear old registration";
-                break;
-            case 87: // ERROR_INVALID_PARAMETER
-                qCritical() << "ERROR_INVALID_PARAMETER (87) - Invalid parameter passed to RegisterHotKey";
-                qCritical() << "Check if window handle is valid:" << (hwnd != nullptr ? "YES" : "NULL");
-                qCritical() << "Check if modifiers are valid (0x" << QString::number(modifiersCode, 16) << ")";
-                qCritical() << "Check if virtual key code is valid:" << vkCode;
-                break;
-            default:
-                qCritical() << "Unknown error - Error code:" << error;
-                break;
-        }
-        
-        // WORKAROUND: Try registering with NULL window handle if Win key is present
-        // Windows API sometimes fails with real window handles for Win key combinations
-        if ((modifiersCode & MOD_WIN) && hwnd != nullptr) {
-            qWarning() << "=== ATTEMPTING WIN KEY WORKAROUND ===";
-            qWarning() << "Win key modifier detected and registration failed with real window handle";
-            qWarning() << "Attempting to register with NULL window handle instead...";
-            
-            HWND nullHwnd = NULL;
-            result = RegisterHotKey(nullHwnd, hotkey.id, modifiersCode, vkCode);
-            
-            qWarning() << "RegisterHotKey with NULL handle returned:" << (result ? "TRUE (success)" : "FALSE (failure)");
-            
-            if (result) {
-                qWarning() << "=== WIN KEY WORKAROUND SUCCESSFUL ===";
-                qWarning() << "Hotkey registered successfully with NULL window handle";
-                qWarning() << "This is a workaround for Windows API Win key restrictions";
-                hotkey.key = key;
-                hotkey.modifiers = modifiers;
-                hotkey.registered = true;
-                hotkey.windowHandle = nullptr; // Store NULL handle
-                qInfo() << "Registered hotkey (with Win key workaround):" << HotkeyType::toDisplayName(type)
-                        << "as:" << QKeySequence(key | modifiers).toString();
-                qDebug() << "HotkeyManager::registerHotkey() - EXIT (returning true)";
-                return true;
-            } else {
-                DWORD nullError = GetLastError();
-                qCritical() << "=== WIN KEY WORKAROUND FAILED ===";
-                qCritical() << "Registration with NULL handle also failed";
-                qCritical() << "Windows error code:" << nullError;
-                qCritical() << "Error code in hex: 0x" << QString::number(nullError, 16);
-            }
-        }
-        
+        qCritical() << "RegisterHotKey failed, error:" << error
+                    << "(0x" << QString::number(error, 16) << ")";
+        if (error == 1409)
+            qCritical() << "Hotkey already registered by this or another application";
         qDebug() << "HotkeyManager::registerHotkey() - EXIT (returning false)";
         return false;
     }
@@ -427,7 +350,8 @@ bool HotkeyManager::registerResourceHotkey(const QString& resourceId, bool isAlt
     hotkey.windowHandle = nullptr;
     
 #ifdef _WIN32
-    hotkey.windowHandle = getMainWindowHandle();
+    // Thread-associated: NULL HWND routes WM_HOTKEY to the thread message queue
+    hotkey.windowHandle = nullptr;
     hotkey.id = ++s_hotkeyIdCounter;
     
     UINT vkCode = static_cast<UINT>(key);

@@ -4,14 +4,17 @@
 #include <QDebug>
 #include <QDir>
 #include <QFile>
+#include <QMutex>
 #include <QStandardPaths>
 #include <QTextStream>
 
 static QFile *logFile = nullptr;
 static QTextStream *logStream = nullptr;
+static QMutex s_logMutex;
 
 void customMessageHandler(QtMsgType type, const QMessageLogContext &context,
                           const QString &msg) {
+  Q_UNUSED(context)
   QString timestamp =
       QDateTime::currentDateTime().toString("yyyy-MM-dd hh:mm:ss.zzz");
   QString level;
@@ -35,8 +38,9 @@ void customMessageHandler(QtMsgType type, const QMessageLogContext &context,
   }
 
   QString logLine =
-      QString("[%1] [%2] %3\n").arg(timestamp).arg(level).arg(msg);
+      QString("[%1] [%2] %3\n").arg(timestamp, level, msg);
 
+  QMutexLocker locker(&s_logMutex);
   if (logStream) {
     *logStream << logLine;
     logStream->flush();

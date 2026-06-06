@@ -32,43 +32,36 @@ MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
       m_dragging(false), m_resizing(false), m_resizeEdge(Qt::Edges()) {
   qDebug() << "MainWindow::MainWindow() - ENTRY";
 
-  try {
-    setupUI();
-    setupWindowFlags();
-    setupWebView();
+  setupUI();
+  setupWindowFlags();
+  setupWebView();
 
-    // Load window configuration
-    AppConfig *config = AppConfig::instance();
-    if (config->load()) {
-      resize(config->getWindowWidth(), config->getWindowHeight());
-      move(config->getWindowX(), config->getWindowY());
-      setWindowOpacity(config->getWindowOpacity() / 100.0);
-      if (config->getAlwaysOnTop()) {
-        setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
-      }
-    }
+  // Load window configuration — config already loaded by Application::initialize()
+  AppConfig *config = AppConfig::instance();
+  resize(config->getWindowWidth(), config->getWindowHeight());
+  move(config->getWindowX(), config->getWindowY());
+  setWindowOpacity(config->getWindowOpacity() / 100.0);
+  if (config->getAlwaysOnTop()) {
+    setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
+  }
 
-    // Connect to ResourceManager signals
-    connect(ResourceManager::instance(), &ResourceManager::resourcesChanged,
-            this, &MainWindow::refreshResources);
-    connect(ResourceManager::instance(),
-            &ResourceManager::activeResourceChanged, this,
-            &MainWindow::switchToResourceById);
+  // Connect to ResourceManager signals
+  connect(ResourceManager::instance(), &ResourceManager::resourcesChanged,
+          this, &MainWindow::refreshResources);
+  connect(ResourceManager::instance(),
+          &ResourceManager::activeResourceChanged, this,
+          &MainWindow::switchToResourceById);
 
-    // Initialize resources
-    refreshResources();
+  // Initialize resources
+  refreshResources();
 
-    // Set initial resource based on startup settings
-    WebResource startupResource =
-        ResourceManager::instance()->getStartupResource();
-    if (startupResource.isValid()) {
-      switchToResourceById(startupResource.id);
-    } else if (!m_tabResourceIds.isEmpty()) {
-      switchToResource(0);
-    }
-
-  } catch (const std::exception &e) {
-    qCritical() << "MainWindow construction failed:" << e.what();
+  // Set initial resource based on startup settings
+  WebResource startupResource =
+      ResourceManager::instance()->getStartupResource();
+  if (startupResource.isValid()) {
+    switchToResourceById(startupResource.id);
+  } else if (!m_tabResourceIds.isEmpty()) {
+    switchToResource(0);
   }
 }
 
@@ -230,11 +223,18 @@ void MainWindow::setupWebView() {
             &MainWindow::onClipboardChanged);
   }
 
+  // Debounce timer: zoom saves fire only after 500ms of scroll idle
+  m_zoomSaveTimer = new QTimer(this);
+  m_zoomSaveTimer->setSingleShot(true);
+  m_zoomSaveTimer->setInterval(500);
+
   QTimer::singleShot(500, this, &MainWindow::applyStartupTheme);
 }
 
 void MainWindow::refreshResources() {
   qDebug() << "MainWindow::refreshResources() - ENTRY";
+
+  if (!m_tabBar) return;  // Guard: setupUI() may not have run yet
 
   // Save current selection if possible
   QString previousId = m_currentResourceId;
@@ -385,17 +385,19 @@ void MainWindow::showAndActivate() {
 #ifdef Q_OS_WIN
   HWND hwnd = (HWND)winId();
   if (hwnd) {
-    // Force window to foreground on Windows
-    // Requires attaching thread input if we are not the foreground process
     DWORD currentThreadId = GetCurrentThreadId();
-    DWORD foregroundThreadId =
-        GetWindowThreadProcessId(GetForegroundWindow(), NULL);
-
-    if (currentThreadId != foregroundThreadId) {
-      AttachThreadInput(foregroundThreadId, currentThreadId, TRUE);
-      SetForegroundWindow(hwnd);
-      SetFocus(hwnd);
-      AttachThreadInput(foregroundThreadId, currentThreadId, FALSE);
+    HWND foreground = GetForegroundWindow();
+    if (foreground) {
+      // Guard: GetForegroundWindow() can return NULL on secure desktop
+      DWORD foregroundThreadId = GetWindowThreadProcessId(foreground, NULL);
+      if (foregroundThreadId && currentThreadId != foregroundThreadId) {
+        AttachThreadInput(foregroundThreadId, currentThreadId, TRUE);
+        SetForegroundWindow(hwnd);
+        SetFocus(hwnd);
+        AttachThreadInput(foregroundThreadId, currentThreadId, FALSE);
+      } else {
+        SetForegroundWindow(hwnd);
+      }
     } else {
       SetForegroundWindow(hwnd);
     }
@@ -430,12 +432,11 @@ void MainWindow::insertClipboardText(bool useAltScript) {
 }
 
 void MainWindow::setOnlineStatus(bool online) {
-  if (m_webView) {
-    if (online) {
-      // m_webView->reload();
-    } else {
-      m_webView->setHtml("<html><body><h2>Offline</h2></body></html>");
-    }
+  if (!m_webView) return;
+  if (online) {
+    m_webView->reloadTranslator();
+  } else {
+    m_webView->setHtml("<html><body><h2>Offline</h2></body></html>");
   }
 }
 
@@ -680,7 +681,10 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
     if (isMaximized())
       return false;
 
-    QPoint localPos = mapFromGlobal(QCursor::pos());
+    // Use lParam screen coordinates — more accurate than QCursor::pos() under
+    // fast movement and multi-monitor DPI scaling.
+    QPoint localPos = mapFromGlobal(
+        QPoint(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam)));
 
     int w = width();
     int h = height();
@@ -742,14 +746,21 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
 void MainWindow::onZoomChanged(const QString &resourceId, double zoomFactor) {
   qDebug() << "MainWindow::onZoomChanged -" << resourceId << zoomFactor;
 
-  // Update resource in ResourceManager
+  // Update in-memory state immediately
   WebResource resource =
       ResourceManager::instance()->getResourceById(resourceId);
   if (resource.isValid()) {
     resource.zoomFactor = zoomFactor;
     ResourceManager::instance()->updateResource(resource);
+  }
 
-    // Save immediately
-    ResourceManager::instance()->saveToConfig();
+  // Debounce: restart timer on every scroll tick; only persist after 500ms idle
+  // This prevents blocking disk I/O on every Ctrl+wheel event.
+  if (m_zoomSaveTimer) {
+    m_zoomSaveTimer->disconnect();
+    connect(m_zoomSaveTimer, &QTimer::timeout, this, []() {
+      ResourceManager::instance()->saveToConfig();
+    });
+    m_zoomSaveTimer->start();
   }
 }

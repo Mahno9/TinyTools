@@ -6,6 +6,7 @@
 #include <QJsonDocument>
 #include <QMutexLocker>
 #include <QStandardPaths>
+#include <string>
 
 
 #ifdef _WIN32
@@ -24,6 +25,12 @@ AppConfig *AppConfig::instance() {
     s_instance = new AppConfig();
   }
   return s_instance;
+}
+
+void AppConfig::cleanupInstance() {
+  QMutexLocker locker(&s_mutex);
+  delete s_instance.data();
+  s_instance = nullptr;
 }
 
 AppConfig::AppConfig() {
@@ -341,13 +348,15 @@ void AppConfig::setAutoStartOnLogin(bool value) {
     // Add to autostart
     if (RegOpenKeyExW(HKEY_CURRENT_USER, regPath, 0, KEY_SET_VALUE, &hKey) ==
         ERROR_SUCCESS) {
-      // Get application path
+      // Get application path and quote it to handle spaces in path
       wchar_t appPath[MAX_PATH];
       GetModuleFileNameW(NULL, appPath, MAX_PATH);
+      std::wstring quotedPath = std::wstring(L"\"") + appPath + L"\"";
 
       // Set registry value
-      RegSetValueExW(hKey, appName, 0, REG_SZ, (const BYTE *)appPath,
-                     (wcslen(appPath) + 1) * sizeof(wchar_t));
+      RegSetValueExW(hKey, appName, 0, REG_SZ,
+                     reinterpret_cast<const BYTE *>(quotedPath.c_str()),
+                     static_cast<DWORD>((quotedPath.size() + 1) * sizeof(wchar_t)));
       RegCloseKey(hKey);
       qInfo() << "Added application to Windows autostart registry";
     } else {

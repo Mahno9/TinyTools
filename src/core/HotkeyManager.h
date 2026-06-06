@@ -89,7 +89,6 @@ private:
     static int s_hotkeyIdCounter;
     
     // Helper methods
-    void* getMainWindowHandle();
     bool unregisterHotkeyInternal(const HotkeyData& hotkey);
     HotkeyData* getHotkeyData(HotkeyType::Type type);
     const HotkeyData* getHotkeyData(HotkeyType::Type type) const;

@@ -1,5 +1,6 @@
 #include "WebViewContainer.h"
 #include "../models/ResourceManager.h"
+#include <QApplication>
 #include <QChildEvent>
 #include <QContextMenuEvent>
 #include <QDebug>
@@ -53,7 +54,10 @@ static QWebEngineProfile *getPersistentProfile() {
     // Create persistent profile with storage path
     QString storagePath =
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-    profile = new QWebEngineProfile("TinyTools", nullptr);
+    // Parent to qApp so Qt destroys the profile when QApplication exits.
+    // MainWindow (and its WebViewContainers/pages) is deleted by Application::~Application()
+    // before QApplication runs its children cleanup, ensuring correct destruction order.
+    profile = new QWebEngineProfile("TinyTools", qApp);
     profile->setPersistentStoragePath(storagePath + "/WebEngineData");
     profile->setCachePath(storagePath + "/WebEngineCache");
     profile->setPersistentCookiesPolicy(
@@ -80,10 +84,10 @@ WebViewContainer::WebViewContainer(QWidget *parent)
   settings->setAttribute(QWebEngineSettings::AutoLoadIconsForPage, false);
   settings->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, false);
   settings->setAttribute(QWebEngineSettings::ShowScrollBars, false);
-  // Keep this enabled just in case user scripts rely on it for other things,
-  // though we are bypassing it for clipboard READ.
+  // Disabled: web pages must not read the OS clipboard directly.
+  // Text is injected via window.tinyToolsClipboard global instead.
   settings->setAttribute(QWebEngineSettings::JavascriptCanAccessClipboard,
-                         true);
+                         false);
 
   // Connect signals
   connect(page, &QWebEnginePage::loadFinished, this,
@@ -116,10 +120,17 @@ void WebViewContainer::loadResource(const WebResource &resource) {
   QUrl url(resource.url);
   if (!url.isValid()) {
     qWarning() << "  WARNING: URL is invalid!";
-  } else {
-    qDebug() << "  Parsed QUrl scheme:" << url.scheme();
-    qDebug() << "  Parsed QUrl host:" << url.host();
+    emit loadError("Invalid URL");
+    return;
   }
+  QString scheme = url.scheme().toLower();
+  if (scheme != QLatin1String("http") && scheme != QLatin1String("https")) {
+    qWarning() << "  Blocked load of non-http(s) URL:" << resource.url;
+    emit loadError("Invalid URL scheme: only http/https allowed");
+    return;
+  }
+  qDebug() << "  Parsed QUrl scheme:" << url.scheme();
+  qDebug() << "  Parsed QUrl host:" << url.host();
 
   qInfo() << "Triggering load(QUrl)...";
   load(url);

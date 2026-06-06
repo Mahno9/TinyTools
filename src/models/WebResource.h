@@ -2,6 +2,7 @@
 
 #include <QJsonObject>
 #include <QString>
+#include <QUrl>
 #include <QUuid>
 #include <Qt>
 
@@ -84,10 +85,13 @@ struct WebResource {
   }
 
   /**
-   * @brief Check if this resource has a valid configuration
+   * @brief Check if this resource has a valid configuration.
+   * Only http/https URLs are accepted to prevent file:// or javascript: injection.
    */
   bool isValid() const {
-    return !id.isEmpty() && !name.isEmpty() && !url.isEmpty();
+    if (id.isEmpty() || name.isEmpty() || url.isEmpty()) return false;
+    QString scheme = QUrl(url).scheme().toLower();
+    return scheme == QLatin1String("http") || scheme == QLatin1String("https");
   }
 
   /**
