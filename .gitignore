@@ -80,3 +80,6 @@ temp/
 # Agent
 .agent/
 task.md
+
+build_msvc
+tinytools_log.txt
