@@ -681,10 +681,13 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
     if (isMaximized())
       return false;
 
-    // QCursor::pos() is in Qt logical coordinates, which is what mapFromGlobal
-    // expects. lParam carries physical pixels and breaks the hit-test on any
-    // display scaled above 100%.
-    QPoint localPos = mapFromGlobal(QCursor::pos());
+    // Use ScreenToClient for physical→client conversion, then scale to logical.
+    // lParam gives physical screen coords; mapFromGlobal expects logical coords,
+    // so naive QPoint(GET_X_LPARAM, GET_Y_LPARAM) breaks on DPI != 100%.
+    POINT pt = {GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam)};
+    ScreenToClient(reinterpret_cast<HWND>(winId()), &pt);
+    qreal dpr = devicePixelRatioF();
+    QPoint localPos(qRound(pt.x / dpr), qRound(pt.y / dpr));
 
     int w = width();
     int h = height();
