@@ -26,7 +26,7 @@ private slots:
     void onHideWindow();
     void onToggleAlwaysOnTop();
     void onOpenSettings();
-    void onReloadTranslator();
+    void onReload();
     void onQuit();
     
 private:

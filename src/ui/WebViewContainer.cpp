@@ -207,7 +207,7 @@ void WebViewContainer::insertAltText(const QString &text) {
   });
 }
 
-void WebViewContainer::reloadTranslator() { reload(); }
+void WebViewContainer::reloadPage() { reload(); }
 
 bool WebViewContainer::isLoading() const {
   return page() && page()->isLoading();

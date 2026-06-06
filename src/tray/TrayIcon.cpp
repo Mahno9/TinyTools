@@ -28,8 +28,8 @@ TrayIcon::TrayIcon(MainWindow* mainWindow, QObject* parent)
     m_trayIcon->setIcon(m_icon);
     qDebug() << "Icon set to SP_ComputerIcon";
     
-    m_trayIcon->setToolTip("Yandex Translator");
-    qDebug() << "Tooltip set to: 'Yandex Translator'";
+    m_trayIcon->setToolTip("TinyTools");
+    qDebug() << "Tooltip set to: 'TinyTools'";
     
     qDebug() << "Creating context menu...";
     createContextMenu();
@@ -113,11 +113,11 @@ void TrayIcon::createContextMenu() {
     connect(settingsAction, &QAction::triggered, this, &TrayIcon::onOpenSettings);
     qDebug() << "'Settings...' action added";
     
-    // Reload Translator
-    qDebug() << "Adding 'Reload Translator' action...";
-    QAction* reloadAction = menu->addAction("Reload Translator");
-    connect(reloadAction, &QAction::triggered, this, &TrayIcon::onReloadTranslator);
-    qDebug() << "'Reload Translator' action added";
+    // Reload
+    qDebug() << "Adding 'Reload' action...";
+    QAction* reloadAction = menu->addAction("Reload");
+    connect(reloadAction, &QAction::triggered, this, &TrayIcon::onReload);
+    qDebug() << "'Reload' action added";
     
     menu->addSeparator();
     qDebug() << "Separator added";
@@ -241,18 +241,18 @@ void TrayIcon::onOpenSettings() {
     qDebug() << "TrayIcon::onOpenSettings() - EXIT";
 }
 
-void TrayIcon::onReloadTranslator() {
-    qDebug() << "TrayIcon::onReloadTranslator() - ENTRY";
-    
+void TrayIcon::onReload() {
+    qDebug() << "TrayIcon::onReload() - ENTRY";
+
     if (m_mainWindow) {
-        qDebug() << "Reloading translator via MainWindow...";
+        qDebug() << "Reloading via MainWindow...";
         m_mainWindow->setOnlineStatus(true);
-        qInfo() << "Translator reloaded";
+        qInfo() << "Reloaded";
     } else {
-        qWarning() << "Cannot reload translator - m_mainWindow is null";
+        qWarning() << "Cannot reload - m_mainWindow is null";
     }
-    
-    qDebug() << "TrayIcon::onReloadTranslator() - EXIT";
+
+    qDebug() << "TrayIcon::onReload() - EXIT";
 }
 
 void TrayIcon::onQuit() {

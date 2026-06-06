@@ -11,7 +11,7 @@ public:
 
   void insertText(const QString &text);
   void insertAltText(const QString &text);
-  void reloadTranslator();
+  void reloadPage();
   bool isLoading() const;
   void applyWebViewTheme(bool darkTheme);
 
@@ -39,8 +39,6 @@ public:
 private:
   void injectJavaScript(const QString &script);
   void waitForPageLoad();
-
-  // Removed hardcoded TRANSLATOR_URL and INPUT_SELECTOR
 
   bool m_darkThemeEnabled;
   bool m_darkThemeApplied;

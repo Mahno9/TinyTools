@@ -15,7 +15,7 @@
  */
 struct WebResource {
   QString id;       // UUID for unique identification
-  QString name;     // Display name (e.g., "Yandex Translate")
+  QString name;     // Display name (e.g., "Google Translate")
   QString url;      // Resource URL
   QString iconPath; // Optional icon path (empty for default)
 

@@ -10,7 +10,7 @@ private:
     
 private slots:
     void initTestCase();
-    void testLoadTranslator();
+    void testLoadResource();
     void testInsertText();
     void cleanupTestCase();
 };
@@ -22,7 +22,7 @@ void TestWebView::initTestCase() {
     m_app = new QApplication(argc, argv);
 }
 
-void TestWebView::testLoadTranslator() {
+void TestWebView::testLoadResource() {
     WebViewContainer webView;
     
     // Note: This is an integration test that would require network access

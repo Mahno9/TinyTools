@@ -96,7 +96,7 @@ void MainWindow::reloadResource(const QString &resourceId) {
 
   if (m_resourceViews.contains(id)) {
     qDebug() << "Reloading resource:" << id;
-    m_resourceViews[id]->reloadTranslator();
+    m_resourceViews[id]->reloadPage();
   } else {
     // If not loaded yet and we are reloading the CURRENT one, load it.
     // If it's a background tab, we might skip loading it until switched to,
@@ -434,7 +434,7 @@ void MainWindow::insertClipboardText(bool useAltScript) {
 void MainWindow::setOnlineStatus(bool online) {
   if (!m_webView) return;
   if (online) {
-    m_webView->reloadTranslator();
+    m_webView->reloadPage();
   } else {
     m_webView->setHtml("<html><body><h2>Offline</h2></body></html>");
   }
