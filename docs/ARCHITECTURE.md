@@ -6,7 +6,7 @@
 
 **Technology Stack:**
 - **Language:** C++17/20
-- **Framework:** Qt 6.x (Core, Gui, Widgets, WebEngine, Network)
+- **Framework:** Qt 6.x (Core, Gui, Widgets, WebEngine)
 - **Build System:** CMake
 - **Platform:** Windows 10/11 (Primary), extensible to Linux/macOS
 
@@ -33,7 +33,6 @@ TinyTools/
 │   ├── core/
 │   │   ├── ClipboardManager.cpp # System clipboard monitoring
 │   │   ├── HotkeyManager.cpp    # Global hotkey hook & routing
-│   │   └── NetworkMonitor.cpp   # Online/Offline detection
 │   ├── models/
 │   │   ├── WebResource.h        # Data struct for a single tool
 │   │   ├── ResourceManager.cpp  # Manager for list of resources

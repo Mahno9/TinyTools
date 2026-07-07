@@ -12,7 +12,7 @@ This document provides detailed instructions for building the TinyTools applicat
      - Qt 6.x (MSVC 2019/2022 64-bit)
      - Qt WebEngine
      - Qt WebChannel
-     - Additional Libraries: Qt Network, Qt Core, Qt Gui, Qt Widgets
+     - Additional Libraries: Qt Core, Qt Gui, Qt Widgets
 
 2. **CMake 3.16+**
    - Download from: https://cmake.org/download/
@@ -41,7 +41,7 @@ This document provides detailed instructions for building the TinyTools applicat
    Add the following to your system environment variables:
 
    ```
-   CMAKE_PREFIX_PATH=C:\Qt\6.3.0\msvc2019_64
+   CMAKE_PREFIX_PATH=C:\Qt\6.10.3\msvc2022_64
    ```
 
 2. **Verify Qt Installation**
@@ -76,7 +76,7 @@ cd build
 
 ```bash
 cmake -G "Visual Studio 16 2019" -A x64 ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.3.0\msvc2019_64" ^
+  -DCMAKE_PREFIX_PATH="C:\Qt\6.10.3\msvc2022_64" ^
   -DCMAKE_BUILD_TYPE=Release ^
   ..
 ```
@@ -85,7 +85,7 @@ cmake -G "Visual Studio 16 2019" -A x64 ^
 
 ```bash
 cmake -G "Visual Studio 17 2022" -A x64 ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.3.0\msvc2019_64" ^
+  -DCMAKE_PREFIX_PATH="C:\Qt\6.10.3\msvc2022_64" ^
   -DCMAKE_BUILD_TYPE=Release ^
   ..
 ```
@@ -94,7 +94,7 @@ cmake -G "Visual Studio 17 2022" -A x64 ^
 
 ```bash
 cmake -G "MinGW Makefiles" ^
-  -DCMAKE_PREFIX_PATH="C:\Qt\6.3.0\mingw_64" ^
+  -DCMAKE_PREFIX_PATH="C:\Qt\6.10.3\mingw_64" ^
   -DCMAKE_BUILD_TYPE=Release ^
   ..
 ```
@@ -263,7 +263,7 @@ Could not find Qt6
 
 **Solution:**
 ```bash
-set CMAKE_PREFIX_PATH=C:\Qt\6.3.0\msvc2019_64
+set CMAKE_PREFIX_PATH=C:\Qt\6.10.3\msvc2022_64
 cmake -G "Visual Studio 16 2019" -A x64 -DCMAKE_PREFIX_PATH="%CMAKE_PREFIX_PATH%" ..
 ```
 

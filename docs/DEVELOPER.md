@@ -112,7 +112,6 @@ private:
 QPointer<MainWindow> m_mainWindow;
 
 // Use smart pointers for non-QObject
-std::unique_ptr<NetworkMonitor> m_networkMonitor;
 
 // Use Qt's parent-child system where possible
 auto* widget = new QWidget(parent);

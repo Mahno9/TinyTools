@@ -15,9 +15,10 @@ A versatile, lightweight desktop utility for Windows (10/11) that provides quick
 - Efficient Qt WebEngine integration (Chromium-based)
 
 🔗 **Multi-Resource Support**
-- Add unlimited web resources (e.g., Google Translate, DeepL, ChatGPT, Stack Overflow)
+- Add up to 10 web resources (e.g., Google Translate, DeepL, ChatGPT, Stack Overflow)
 - Switch between resources instantly using Tabs or Hotkeys (`Alt+1`, `Alt+2`, etc.)
 - Configure custom JavaScript to execute on load for each resource
+- Enable/disable resources without deleting them
 
 🎯 **Global Hotkeys**
 - **Main Toggle**: Toggle window visibility (Default: `Ctrl+Alt+T`)
@@ -68,7 +69,19 @@ A versatile, lightweight desktop utility for Windows (10/11) that provides quick
 
 ## Configuration
 
-Configuration is stored in `%APPDATA%\TinyTools\settings.json`.
+Configuration is stored in `%APPDATA%\TinyTools\settings.json` (written atomically;
+a corrupt file is preserved as `settings.json.bak` instead of being overwritten).
+
+The application log is `%APPDATA%\TinyTools\tinytools.log` (rotated at 5 MB).
+Set the `TINYTOOLS_DEBUG=1` environment variable to enable verbose debug logging.
+
+Notes:
+- The **Minimize to Tray** setting controls the close button: enabled (default) hides
+  the window to the tray, disabled quits the application.
+- `window.tinyToolsClipboard` is available to your Open/Alt scripts during execution
+  and is cleared ~5 seconds after the script runs — copy the value synchronously.
+- **Importing presets runs their JavaScript inside the sites you open** (with access
+  to your logged-in sessions). Only import presets from sources you trust.
 
 ### Example Resource Config (JSON)
 
