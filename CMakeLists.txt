@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.16)
-project(TinyTools VERSION 1.0.0 LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.22)
+project(TinyTools VERSION 1.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -10,7 +10,6 @@ find_package(Qt6 REQUIRED COMPONENTS
     Widgets
     WebEngineCore
     WebEngineWidgets
-    Network
 )
 
 # Enable automatic MOC, UIC, and RCC
@@ -22,9 +21,9 @@ set(CMAKE_AUTORCC ON)
 set(SOURCES
     src/main.cpp
     src/app/Application.cpp
+    src/app/Logging.cpp
     src/core/ClipboardManager.cpp
     src/core/HotkeyManager.cpp
-    src/core/NetworkMonitor.cpp
     src/ui/MainWindow.cpp
     src/ui/SettingsDialog.cpp
     src/ui/WebViewContainer.cpp
@@ -38,9 +37,9 @@ set(SOURCES
 set(HEADERS
     src/app/Application.h
     src/app/Constants.h
+    src/app/Logging.h
     src/core/ClipboardManager.h
     src/core/HotkeyManager.h
-    src/core/NetworkMonitor.h
     src/ui/MainWindow.h
     src/ui/SettingsDialog.h
     src/ui/WebViewContainer.h
@@ -59,7 +58,6 @@ target_link_libraries(TinyTools PRIVATE
     Qt6::Widgets
     Qt6::WebEngineCore
     Qt6::WebEngineWidgets
-    Qt6::Network
 )
 
 if(WIN32)
@@ -86,10 +84,12 @@ find_package(Qt6 COMPONENTS Test REQUIRED)
 
 # Shared source files compiled into every test (no main, no WebEngine UI deps)
 set(TEST_SHARED_SOURCES
+    src/app/Logging.cpp
     src/models/AppConfig.cpp
     src/models/ResourceManager.cpp
     src/core/HotkeyManager.cpp
     src/core/ClipboardManager.cpp
+    src/ui/HotkeyEdit.cpp
 )
 
 function(add_unit_test TEST_NAME)
@@ -108,6 +108,16 @@ function(add_unit_test TEST_NAME)
         target_link_libraries(${TEST_NAME} PRIVATE dwmapi)
     endif()
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
+    # Offscreen platform: tests must not depend on a visible desktop session.
+    set_tests_properties(${TEST_NAME} PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    if(WIN32)
+        # Test executables need Qt DLLs on PATH (no windeployqt for tests)
+        get_target_property(QT_CORE_DLL Qt6::Core LOCATION)
+        get_filename_component(QT_BIN_DIR "${QT_CORE_DLL}" DIRECTORY)
+        set_tests_properties(${TEST_NAME} PROPERTIES
+            ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${QT_BIN_DIR}")
+    endif()
 endfunction()
 
 add_unit_test(test_webresource)
@@ -115,5 +125,5 @@ add_unit_test(test_config)
 add_unit_test(test_resource_manager)
 add_unit_test(test_logging)
 add_unit_test(test_hotkey)
+add_unit_test(test_hotkeyedit)
 add_unit_test(test_clipboard)
-

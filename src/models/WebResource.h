@@ -86,12 +86,16 @@ struct WebResource {
 
   /**
    * @brief Check if this resource has a valid configuration.
-   * Only http/https URLs are accepted to prevent file:// or javascript: injection.
+   * Only http/https URLs with a host are accepted, preventing file:// or
+   * javascript: injection and placeholder URLs like "https://".
    */
   bool isValid() const {
     if (id.isEmpty() || name.isEmpty() || url.isEmpty()) return false;
-    QString scheme = QUrl(url).scheme().toLower();
-    return scheme == QLatin1String("http") || scheme == QLatin1String("https");
+    QUrl parsed(url);
+    QString scheme = parsed.scheme().toLower();
+    if (scheme != QLatin1String("http") && scheme != QLatin1String("https"))
+      return false;
+    return !parsed.host().isEmpty();
   }
 
   /**

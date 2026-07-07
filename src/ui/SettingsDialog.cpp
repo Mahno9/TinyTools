@@ -1,8 +1,8 @@
 #include "SettingsDialog.h"
+#include "../app/Constants.h"
 #include "../core/HotkeyManager.h"
 #include "../models/AppConfig.h"
 #include "../models/ResourceManager.h"
-#include "../models/WebResource.h"
 #include "HotkeyEdit.h"
 
 #ifdef Q_OS_WIN
@@ -23,10 +23,18 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScrollArea>
+#include <QSet>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QToolButton>
 #include <QVBoxLayout>
+
+namespace {
+bool hasRequiredModifier(Qt::KeyboardModifiers mods) {
+  // Shift alone is not enough: a global "Shift+T" would swallow typing.
+  return mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier);
+}
+} // namespace
 
 SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
   setWindowTitle("TinyTools Settings");
@@ -34,8 +42,6 @@ SettingsDialog::SettingsDialog(QWidget *parent) : QDialog(parent) {
   setupUI();
   loadSettings();
 }
-
-SettingsDialog::~SettingsDialog() {}
 
 void SettingsDialog::setupUI() {
   // Apply theme based on config
@@ -68,6 +74,7 @@ void SettingsDialog::setupUI() {
         "QPushButton:hover { background: #555; }"
         "QPushButton:pressed { background: #333; }"
         "QCheckBox { color: #ccc; }"
+        "QRadioButton { color: #ddd; }"
         "QScrollArea { background: transparent; border: none; }"
         "QScrollBar:vertical { background: #333; width: 12px; }"
         "QScrollBar::handle:vertical { background: #555; min-height: 20px; }"
@@ -104,12 +111,10 @@ void SettingsDialog::setupUI() {
   // Create tab widget
   m_tabWidget = new QTabWidget(this);
 
-  // Tab 1: General
   QWidget *generalTab = new QWidget();
   setupGeneralTab(generalTab);
   m_tabWidget->addTab(generalTab, "General");
 
-  // Tab 2: Resources
   QWidget *resourcesTab = new QWidget();
   setupResourcesTab(resourcesTab);
   m_tabWidget->addTab(resourcesTab, "Resources");
@@ -120,7 +125,8 @@ void SettingsDialog::setupUI() {
   QHBoxLayout *buttonLayout = new QHBoxLayout();
 
   m_resetButton = new QPushButton("Reset to Defaults", this);
-  m_resetButton->setToolTip("Reset all settings to default values");
+  m_resetButton->setToolTip(
+      "Reset the controls to default values (applied on OK/Apply)");
   buttonLayout->addWidget(m_resetButton);
 
   buttonLayout->addStretch();
@@ -136,11 +142,10 @@ void SettingsDialog::setupUI() {
 
   mainLayout->addLayout(buttonLayout);
 
-  // Connect common signals
   connect(m_resetButton, &QPushButton::clicked, this,
           &SettingsDialog::onResetClicked);
   connect(m_applyButton, &QPushButton::clicked, this,
-          &SettingsDialog::applySettings);
+          &SettingsDialog::onApplyClicked);
   connect(okButton, &QPushButton::clicked, this, &SettingsDialog::onAccepted);
   connect(cancelButton, &QPushButton::clicked, this, &QDialog::reject);
 }
@@ -157,7 +162,8 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
 
   m_mainHotkeyEdit = new HotkeyEdit(this);
   m_mainHotkeyEdit->setToolTip(
-      "Click Record and press the desired key combination");
+      "Click Record and press the desired key combination (must include "
+      "Ctrl, Alt or Win)");
   mainHotkeyLayout->addRow("Hotkey:", m_mainHotkeyEdit);
 
   layout->addWidget(mainHotkeyGroup);
@@ -171,7 +177,8 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
 
   m_altHotkeyEdit = new HotkeyEdit(this);
   m_altHotkeyEdit->setToolTip(
-      "Click Record and press the desired key combination");
+      "Click Record and press the desired key combination (must include "
+      "Ctrl, Alt or Win)");
   altHotkeyLayout->addRow("Hotkey:", m_altHotkeyEdit);
 
   layout->addWidget(altHotkeyGroup);
@@ -210,14 +217,13 @@ void SettingsDialog::setupGeneralTab(QWidget *tab) {
   generalLayout->addRow("Auto-start on Login:", m_autoStartOnLoginCheckBox);
 
   m_minimizeToTrayCheckBox = new QCheckBox(this);
-  m_minimizeToTrayCheckBox->setToolTip("Minimize to tray instead of closing");
+  m_minimizeToTrayCheckBox->setToolTip(
+      "Close button hides the window to tray instead of quitting");
   generalLayout->addRow("Minimize to Tray:", m_minimizeToTrayCheckBox);
 
   m_darkThemeCheckBox = new QCheckBox(this);
   m_darkThemeCheckBox->setToolTip("Enable dark theme");
   generalLayout->addRow("Dark Theme:", m_darkThemeCheckBox);
-
-  // m_autoTranslateCheckBox removed as execution is now mandatory
 
   layout->addWidget(generalGroup);
   layout->addStretch();
@@ -234,14 +240,6 @@ void SettingsDialog::setupResourcesTab(QWidget *tab) {
   m_startupSelectedRadio =
       new QRadioButton("Always open selected resource:", this);
 
-  // Apply theme
-  bool darkTheme = AppConfig::instance()->getDarkTheme();
-  if (darkTheme) {
-    QString radioStyle = "QRadioButton { color: #ddd; }";
-    m_startupLastUsedRadio->setStyleSheet(radioStyle);
-    m_startupSelectedRadio->setStyleSheet(radioStyle);
-  }
-
   QButtonGroup *startupButtonGroup = new QButtonGroup(this);
   startupButtonGroup->addButton(m_startupLastUsedRadio);
   startupButtonGroup->addButton(m_startupSelectedRadio);
@@ -251,10 +249,6 @@ void SettingsDialog::setupResourcesTab(QWidget *tab) {
 
   connect(m_startupSelectedRadio, &QRadioButton::toggled,
           m_defaultResourceCombo, &QComboBox::setEnabled);
-  connect(m_startupLastUsedRadio, &QRadioButton::toggled, this,
-          &SettingsDialog::onStartupModeChanged);
-  connect(m_startupSelectedRadio, &QRadioButton::toggled, this,
-          &SettingsDialog::onStartupModeChanged);
 
   startupLayout->addWidget(m_startupLastUsedRadio);
 
@@ -316,7 +310,7 @@ class ResourcePanel : public QWidget {
 public:
   ResourcePanel(const WebResource &resource, bool darkTheme,
                 QWidget *parent = nullptr)
-      : QWidget(parent), m_resourceId(resource.id), m_isExpanded(false) {
+      : QWidget(parent), m_resourceId(resource.id) {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(0, 0, 0, 0);
     mainLayout->setSpacing(0);
@@ -352,10 +346,9 @@ public:
     m_contentWidget->setObjectName("contentWidget");
     m_contentWidget->setVisible(false); // Collapsed by default
 
-    // Inner layout
     m_contentLayout = new QVBoxLayout(m_contentWidget);
 
-    // Resource Name
+    // Resource Name + Enabled
     QHBoxLayout *nameLayout = new QHBoxLayout();
     nameLayout->addWidget(new QLabel("Name:"));
     QLineEdit *nameEdit = new QLineEdit(resource.name);
@@ -363,6 +356,12 @@ public:
     connect(nameEdit, &QLineEdit::textChanged, this,
             [this](const QString &text) { m_toggleButton->setText(text); });
     nameLayout->addWidget(nameEdit, 1);
+
+    QCheckBox *enabledCheck = new QCheckBox("Enabled");
+    enabledCheck->setObjectName("enabledCheck");
+    enabledCheck->setChecked(resource.isEnabled);
+    enabledCheck->setToolTip("Disabled resources are hidden from the tab bar");
+    nameLayout->addWidget(enabledCheck);
     m_contentLayout->addLayout(nameLayout);
 
     // URL
@@ -426,7 +425,34 @@ public:
 
   QString getResourceId() const { return m_resourceId; }
 
-  QGroupBox *getContentWidget() const { return m_contentWidget; }
+  // Reads current panel fields into the resource (id/order untouched).
+  void applyTo(WebResource &resource) const {
+    auto *nameEdit = m_contentWidget->findChild<QLineEdit *>("nameEdit");
+    auto *urlEdit = m_contentWidget->findChild<QLineEdit *>("urlEdit");
+    auto *zoomSpinBox = m_contentWidget->findChild<QSpinBox *>("zoomSpinBox");
+    auto *enabledCheck = m_contentWidget->findChild<QCheckBox *>("enabledCheck");
+    auto *initScriptEdit =
+        m_contentWidget->findChild<QPlainTextEdit *>("initScriptEdit");
+    auto *openScriptEdit =
+        m_contentWidget->findChild<QPlainTextEdit *>("openScriptEdit");
+    auto *altScriptEdit =
+        m_contentWidget->findChild<QPlainTextEdit *>("altScriptEdit");
+
+    if (nameEdit)
+      resource.name = nameEdit->text().trimmed();
+    if (urlEdit)
+      resource.url = urlEdit->text().trimmed();
+    if (zoomSpinBox)
+      resource.zoomFactor = zoomSpinBox->value() / 100.0;
+    if (enabledCheck)
+      resource.isEnabled = enabledCheck->isChecked();
+    if (initScriptEdit)
+      resource.initScript = initScriptEdit->toPlainText();
+    if (openScriptEdit)
+      resource.openScript = openScriptEdit->toPlainText();
+    if (altScriptEdit)
+      resource.altOpenScript = altScriptEdit->toPlainText();
+  }
 
   void setDeleteAction(std::function<void()> action) {
     QPushButton *deleteButton = new QPushButton("Delete Resource", this);
@@ -435,7 +461,6 @@ public:
     m_contentLayout->addWidget(deleteButton);
   }
 
-  // Programmatically expand/collapse
   void setExpanded(bool expanded) {
     m_toggleButton->setChecked(expanded);
     onToggled(expanded);
@@ -452,19 +477,16 @@ private:
   QToolButton *m_toggleButton;
   QGroupBox *m_contentWidget;
   QVBoxLayout *m_contentLayout;
-  bool m_isExpanded;
 };
-
-// ... in SettingsDialog methods ...
 
 QWidget *SettingsDialog::createResourcePanel(const WebResource &resource) {
   bool darkTheme = AppConfig::instance()->getDarkTheme();
   ResourcePanel *panel = new ResourcePanel(resource, darkTheme, this);
   panel->setDeleteAction(
-      [this, resource]() { onResourceDeleteClicked(resource.id); });
+      [this, id = resource.id]() { onResourceDeleteClicked(id); });
 
-  // Auto-expand if new (name is default)
-  if (resource.name == "New Resource") {
+  // Auto-expand freshly added resources so the user can fill in the URL
+  if (resource.url.isEmpty()) {
     panel->setExpanded(true);
   }
 
@@ -473,111 +495,143 @@ QWidget *SettingsDialog::createResourcePanel(const WebResource &resource) {
 
 void SettingsDialog::onResourceDeleteClicked(const QString &resourceId) {
   int result = QMessageBox::question(
-      this, "Delete Resource", "Are you sure you want to delete this resource?",
+      this, "Delete Resource",
+      "Delete this resource? The change is applied when you press OK or "
+      "Apply.",
       QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
 
-  if (result == QMessageBox::Yes) {
-    ResourceManager::instance()->removeResource(resourceId);
-    refreshResourcePanels();
+  if (result != QMessageBox::Yes) {
+    return;
   }
+
+  syncPanelsToWorking(); // keep edits made to other panels
+  for (int i = 0; i < m_workingResources.size(); ++i) {
+    if (m_workingResources[i].id == resourceId) {
+      m_workingResources.removeAt(i);
+      break;
+    }
+  }
+  refreshResourcePanels();
 }
 
 void SettingsDialog::onAddResourceClicked() {
-  WebResource newResource = WebResource::create("New Resource", "https://");
-  newResource.order = ResourceManager::instance()->getResourceCount();
-  ResourceManager::instance()->addResource(newResource);
+  if (m_workingResources.size() >= Constants::MAX_RESOURCES) {
+    QMessageBox::information(
+        this, "Limit reached",
+        QString("A maximum of %1 resources is supported.")
+            .arg(Constants::MAX_RESOURCES));
+    return;
+  }
+
+  syncPanelsToWorking();
+  WebResource newResource = WebResource::create("New Resource", QString());
+  newResource.order = m_workingResources.size();
+  m_workingResources.append(newResource);
   refreshResourcePanels();
 }
 
 void SettingsDialog::onImportPresetsClicked() {
   QString filePath = QFileDialog::getOpenFileName(
       this, "Import Presets", QString(), "JSON Files (*.json)");
-
-  if (!filePath.isEmpty()) {
-    if (ResourceManager::instance()->importPresets(filePath)) {
-      refreshResourcePanels();
-      QMessageBox::information(this, "Import Successful",
-                               "Resources imported successfully.");
-    } else {
-      QMessageBox::warning(this, "Import Failed",
-                           "Failed to import resources from file.");
-    }
+  if (filePath.isEmpty()) {
+    return;
   }
+
+  // Imported presets contain JavaScript that runs inside the pages the user
+  // opens - i.e. with access to their logged-in sessions. Make that explicit.
+  int confirm = QMessageBox::warning(
+      this, "Import Presets",
+      "Imported resources can contain JavaScript that will run on the "
+      "websites you open, with access to your logged-in sessions on those "
+      "sites.\n\nOnly import presets from sources you trust.\n\nContinue?",
+      QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+  if (confirm != QMessageBox::Yes) {
+    return;
+  }
+
+  QString error;
+  const QList<WebResource> parsed =
+      ResourceManager::parsePresets(filePath, &error);
+  if (!error.isEmpty()) {
+    QMessageBox::warning(this, "Import Failed", error);
+    return;
+  }
+  if (parsed.isEmpty()) {
+    QMessageBox::warning(this, "Import Failed",
+                         "The file contains no valid resources.");
+    return;
+  }
+
+  syncPanelsToWorking();
+  int imported = 0;
+  for (const WebResource &resource : parsed) {
+    if (m_workingResources.size() >= Constants::MAX_RESOURCES) {
+      break;
+    }
+    m_workingResources.append(resource);
+    imported++;
+  }
+  refreshResourcePanels();
+
+  QString message = QString("Imported %1 resource(s).").arg(imported);
+  if (imported < parsed.size()) {
+    message += QString(" %1 skipped (limit of %2 reached).")
+                   .arg(parsed.size() - imported)
+                   .arg(Constants::MAX_RESOURCES);
+  }
+  message += "\nThe changes are applied when you press OK or Apply.";
+  QMessageBox::information(this, "Import", message);
 }
 
 void SettingsDialog::onExportPresetsClicked() {
   QString filePath = QFileDialog::getSaveFileName(
       this, "Export Presets", "tinytools_presets.json", "JSON Files (*.json)");
-
-  if (!filePath.isEmpty()) {
-    if (ResourceManager::instance()->exportPresets(filePath)) {
-      QMessageBox::information(this, "Export Successful",
-                               "Resources exported successfully.");
-    } else {
-      QMessageBox::warning(this, "Export Failed",
-                           "Failed to export resources to file.");
-    }
-  }
-}
-
-void SettingsDialog::onStartupModeChanged() {
-  // This will be saved when Apply/OK is clicked
-}
-
-void SettingsDialog::loadSettings() {
-  qDebug() << "SettingsDialog::loadSettings() - ENTRY";
-
-  AppConfig *config = AppConfig::instance();
-  if (!config->load()) {
-    qWarning() << "Failed to load settings";
+  if (filePath.isEmpty()) {
     return;
   }
 
-  // Load Main Toggle hotkey
-  int mainKey = config->getHotkeyKey(HotkeyType::MainToggle);
-  Qt::KeyboardModifiers mainMod =
-      config->getHotkeyModifiers(HotkeyType::MainToggle);
-  m_mainHotkeyEdit->setHotkey(mainKey, mainMod);
+  syncPanelsToWorking();
+  if (ResourceManager::writePresets(filePath, m_workingResources)) {
+    QMessageBox::information(this, "Export Successful",
+                             "Resources exported successfully.");
+  } else {
+    QMessageBox::warning(this, "Export Failed",
+                         "Failed to export resources to file.");
+  }
+}
 
-  // Load Alternative Toggle hotkey
-  int altKey = config->getHotkeyKey(HotkeyType::AlternativeToggle);
-  Qt::KeyboardModifiers altMod =
-      config->getHotkeyModifiers(HotkeyType::AlternativeToggle);
-  m_altHotkeyEdit->setHotkey(altKey, altMod);
+void SettingsDialog::loadSettings() {
+  // Read the current in-memory state. Deliberately no disk reload here:
+  // it would clobber unsaved in-memory changes (e.g. debounced zoom updates).
+  AppConfig *config = AppConfig::instance();
 
-  // Load window settings
+  m_mainHotkeyEdit->setHotkey(config->getHotkeyKey(HotkeyType::MainToggle),
+                              config->getHotkeyModifiers(HotkeyType::MainToggle));
+  m_altHotkeyEdit->setHotkey(
+      config->getHotkeyKey(HotkeyType::AlternativeToggle),
+      config->getHotkeyModifiers(HotkeyType::AlternativeToggle));
+
   m_alwaysOnTopCheckBox->setChecked(config->getAlwaysOnTop());
   m_opacitySpinBox->setValue(config->getWindowOpacity());
 
-  // Load general settings
   m_showWindowOnStartupCheckBox->setChecked(config->getShowWindowOnStartup());
   m_autoStartOnLoginCheckBox->setChecked(config->getAutoStartOnLogin());
   m_minimizeToTrayCheckBox->setChecked(config->getMinimizeToTray());
   m_darkThemeCheckBox->setChecked(config->getDarkTheme());
-  m_darkThemeCheckBox->setChecked(config->getDarkTheme());
-  // m_autoTranslateCheckBox->setChecked(config->getAutoTranslate());
 
-  // Load Resources tab
-  ResourceManager::instance()->loadFromConfig();
+  ResourceManager *rm = ResourceManager::instance();
+  m_workingResources = rm->getAllResources();
 
-  // Startup mode
-  if (ResourceManager::instance()->getStartupMode() ==
-      ResourceManager::LastUsed) {
+  if (rm->getStartupMode() == ResourceManager::LastUsed) {
     m_startupLastUsedRadio->setChecked(true);
   } else {
     m_startupSelectedRadio->setChecked(true);
   }
 
   refreshResourcePanels();
-
-  qDebug() << "SettingsDialog::loadSettings() - EXIT";
 }
 
-// ... (ResourcePanel class definition assumed correct) ...
-
 void SettingsDialog::refreshResourcePanels() {
-  qDebug() << "SettingsDialog::refreshResourcePanels() - ENTRY";
-
   // Clear existing panels
   for (QWidget *panel : m_resourcePanels) {
     m_resourcePanelsLayout->removeWidget(panel);
@@ -585,12 +639,7 @@ void SettingsDialog::refreshResourcePanels() {
   }
   m_resourcePanels.clear();
 
-  // Rebuild from ResourceManager
-  ResourceManager *rm = ResourceManager::instance();
-  QList<WebResource> resources = rm->getAllResources();
-  qDebug() << "Refreshing panels for" << resources.size() << "resources";
-
-  for (const WebResource &resource : resources) {
+  for (const WebResource &resource : m_workingResources) {
     QWidget *panel = createResourcePanel(resource);
     m_resourcePanels.append(panel);
     // Insert before the stretch
@@ -599,141 +648,164 @@ void SettingsDialog::refreshResourcePanels() {
   }
 
   // Update default resource combo
+  QString previousDefault = m_defaultResourceCombo->currentData().toString();
+  if (previousDefault.isEmpty()) {
+    previousDefault = ResourceManager::instance()->getDefaultResourceId();
+  }
   m_defaultResourceCombo->clear();
-  for (const WebResource &resource : resources) {
+  for (const WebResource &resource : m_workingResources) {
     m_defaultResourceCombo->addItem(resource.name, resource.id);
   }
-
-  // Select current default
-  QString defaultId = rm->getDefaultResourceId();
-  int index = m_defaultResourceCombo->findData(defaultId);
+  int index = m_defaultResourceCombo->findData(previousDefault);
   if (index >= 0) {
     m_defaultResourceCombo->setCurrentIndex(index);
   }
-  qDebug() << "SettingsDialog::refreshResourcePanels() - EXIT";
 }
 
-void SettingsDialog::saveSettings() {
-  qDebug() << "SettingsDialog::saveSettings() - ENTRY";
+void SettingsDialog::syncPanelsToWorking() {
+  for (QWidget *widget : m_resourcePanels) {
+    // All entries are created by createResourcePanel(), so the cast is safe.
+    auto *panel = static_cast<ResourcePanel *>(widget);
+    for (auto &resource : m_workingResources) {
+      if (resource.id == panel->getResourceId()) {
+        panel->applyTo(resource);
+        break;
+      }
+    }
+  }
+}
+
+bool SettingsDialog::validateSettings(QString *error) const {
+  const int mainKey = m_mainHotkeyEdit->key();
+  const Qt::KeyboardModifiers mainMod = m_mainHotkeyEdit->modifiers();
+  const int altKey = m_altHotkeyEdit->key();
+  const Qt::KeyboardModifiers altMod = m_altHotkeyEdit->modifiers();
+
+  if (mainKey == 0) {
+    *error = "Main hotkey is not set.";
+    return false;
+  }
+  if (altKey == 0) {
+    *error = "Alternative hotkey is not set.";
+    return false;
+  }
+  if (!hasRequiredModifier(mainMod) || !hasRequiredModifier(altMod)) {
+    *error = "Hotkeys must include Ctrl, Alt or Win - a bare key would "
+             "intercept normal typing system-wide.";
+    return false;
+  }
+  if (mainKey == altKey && mainMod == altMod) {
+    *error = "Main and Alternative hotkeys must be different.";
+    return false;
+  }
+
+  for (const WebResource &resource : m_workingResources) {
+    if (resource.name.trimmed().isEmpty()) {
+      *error = "A resource has an empty name.";
+      return false;
+    }
+    if (!resource.isValid()) {
+      *error = QString("Resource \"%1\" has an invalid URL (\"%2\"). "
+                       "Only http/https URLs with a host are allowed.")
+                   .arg(resource.name, resource.url);
+      return false;
+    }
+  }
+  return true;
+}
+
+bool SettingsDialog::saveSettings() {
+  syncPanelsToWorking();
+
+  QString error;
+  if (!validateSettings(&error)) {
+    QMessageBox::warning(this, "Invalid Settings", error);
+    return false;
+  }
 
   AppConfig *config = AppConfig::instance();
 
-  // Save Main Toggle hotkey
-  int mainKey = m_mainHotkeyEdit->key();
-  if (mainKey == 0)
-    mainKey = Qt::Key_T;
-  Qt::KeyboardModifiers mainMod = m_mainHotkeyEdit->modifiers();
-  config->setHotkey(HotkeyType::MainToggle, mainKey, mainMod);
+  config->setHotkey(HotkeyType::MainToggle, m_mainHotkeyEdit->key(),
+                    m_mainHotkeyEdit->modifiers());
+  config->setHotkey(HotkeyType::AlternativeToggle, m_altHotkeyEdit->key(),
+                    m_altHotkeyEdit->modifiers());
 
-  // Save Alternative Toggle hotkey
-  int altKey = m_altHotkeyEdit->key();
-  if (altKey == 0)
-    altKey = Qt::Key_S;
-  Qt::KeyboardModifiers altMod = m_altHotkeyEdit->modifiers();
-  config->setHotkey(HotkeyType::AlternativeToggle, altKey, altMod);
-
-  // Save window settings
   config->setAlwaysOnTop(m_alwaysOnTopCheckBox->isChecked());
   config->setWindowOpacity(m_opacitySpinBox->value());
 
-  // Save general settings
   config->setShowWindowOnStartup(m_showWindowOnStartupCheckBox->isChecked());
   config->setAutoStartOnLogin(m_autoStartOnLoginCheckBox->isChecked());
   config->setMinimizeToTray(m_minimizeToTrayCheckBox->isChecked());
   config->setDarkTheme(m_darkThemeCheckBox->isChecked());
-  config->setDarkTheme(m_darkThemeCheckBox->isChecked());
-  // config->setAutoTranslate(m_autoTranslateCheckBox->isChecked());
 
-  // Save resource panels
-  qDebug() << "Saving" << m_resourcePanels.size() << "resource panels...";
-  for (QWidget *widget : m_resourcePanels) {
-    ResourcePanel *panel = dynamic_cast<ResourcePanel *>(widget);
-    if (panel) {
-      QString resourceId = panel->getResourceId();
-      qDebug() << "Saving panel for resource:" << resourceId;
-      saveResourceFromPanel(panel, resourceId);
-    } else {
-      qWarning()
-          << "Found widget in m_resourcePanels that is not a ResourcePanel!";
+  // Apply the working copy to ResourceManager as a diff
+  ResourceManager *rm = ResourceManager::instance();
+
+  QSet<QString> workingIds;
+  for (const auto &resource : m_workingResources) {
+    workingIds.insert(resource.id);
+  }
+  const QList<WebResource> current = rm->getAllResources();
+  for (const auto &resource : current) {
+    if (!workingIds.contains(resource.id)) {
+      rm->removeResource(resource.id);
     }
   }
 
-  // Save startup mode
-  ResourceManager *rm = ResourceManager::instance();
+  QStringList orderedIds;
+  for (int i = 0; i < m_workingResources.size(); ++i) {
+    WebResource resource = m_workingResources[i];
+    resource.order = i;
+    m_workingResources[i] = resource;
+    if (rm->getResourceById(resource.id).isValid()) {
+      rm->updateResource(resource);
+    } else {
+      rm->addResource(resource);
+    }
+    orderedIds << resource.id;
+  }
+  rm->reorderResources(orderedIds);
+
+  // Startup mode
   if (m_startupLastUsedRadio->isChecked()) {
     rm->setStartupMode(ResourceManager::LastUsed);
   } else {
     rm->setStartupMode(ResourceManager::SelectedResource);
-    QString selectedId = m_defaultResourceCombo->currentData().toString();
-    rm->setDefaultResourceId(selectedId);
+    rm->setDefaultResourceId(m_defaultResourceCombo->currentData().toString());
   }
 
-  // Save to disk
-  qDebug() << "Calling ResourceManager::saveToConfig()...";
-  if (rm->saveToConfig()) {
-    qDebug() << "ResourceManager::saveToConfig() SUCCESS";
-  } else {
-    qCritical() << "ResourceManager::saveToConfig() FAILED";
+  if (!rm->saveToConfig()) {
+    QMessageBox::warning(this, "Save Failed",
+                         "Failed to save settings to disk. Check the log for "
+                         "details.");
+    return false;
   }
-
-  // AppConfig::save is already called by rm->saveToConfig, but let's be safe
-  // and check if config is dirty? Actually, saveToConfig updates the config
-  // object and calls save(), so calling it again is redundant but harmless.
-  // Let's rely on rm->saveToConfig() for the actual disk write of resources.
-
-  qDebug() << "SettingsDialog::saveSettings() - EXIT";
+  return true;
 }
 
-void SettingsDialog::saveResourceFromPanel(QWidget *widget,
-                                           const QString &resourceId) {
-  ResourcePanel *panel = dynamic_cast<ResourcePanel *>(widget);
-  if (!panel)
-    return;
-
-  WebResource resource =
-      ResourceManager::instance()->getResourceById(resourceId);
-  if (!resource.isValid()) {
-    qWarning() << "Invalid resource found during save:" << resourceId;
-    return;
+void SettingsDialog::onApplyClicked() {
+  if (saveSettings()) {
+    // Renames from the panels are now saved; refresh combo labels
+    for (int i = 0; i < m_defaultResourceCombo->count(); ++i) {
+      const QString id = m_defaultResourceCombo->itemData(i).toString();
+      for (const auto &resource : m_workingResources) {
+        if (resource.id == id) {
+          m_defaultResourceCombo->setItemText(i, resource.name);
+          break;
+        }
+      }
+    }
   }
-
-  QGroupBox *content = panel->getContentWidget();
-
-  QLineEdit *nameEdit = content->findChild<QLineEdit *>("nameEdit");
-  QLineEdit *urlEdit = content->findChild<QLineEdit *>("urlEdit");
-  QSpinBox *zoomSpinBox = content->findChild<QSpinBox *>("zoomSpinBox");
-  QPlainTextEdit *initScriptEdit =
-      content->findChild<QPlainTextEdit *>("initScriptEdit");
-  QPlainTextEdit *openScriptEdit =
-      content->findChild<QPlainTextEdit *>("openScriptEdit");
-  QPlainTextEdit *altScriptEdit =
-      content->findChild<QPlainTextEdit *>("altScriptEdit");
-
-  if (nameEdit)
-    resource.name = nameEdit->text();
-  if (urlEdit)
-    resource.url = urlEdit->text();
-  if (zoomSpinBox)
-    resource.zoomFactor = zoomSpinBox->value() / 100.0;
-  if (initScriptEdit)
-    resource.initScript = initScriptEdit->toPlainText();
-  if (openScriptEdit)
-    resource.openScript = openScriptEdit->toPlainText();
-  if (altScriptEdit)
-    resource.altOpenScript = altScriptEdit->toPlainText();
-
-  ResourceManager::instance()->updateResource(resource);
 }
-
-void SettingsDialog::applySettings() { saveSettings(); }
 
 void SettingsDialog::onAccepted() {
-  saveSettings();
-  accept();
+  if (saveSettings()) {
+    accept();
+  }
 }
 
 void SettingsDialog::onResetClicked() {
-  // Reset General tab - hotkeys
+  // Resets the controls only; nothing is applied until OK/Apply.
   m_mainHotkeyEdit->setHotkey(Qt::Key_T, Qt::ControlModifier | Qt::AltModifier);
   m_altHotkeyEdit->setHotkey(Qt::Key_S, Qt::ControlModifier | Qt::AltModifier);
 
@@ -744,34 +816,8 @@ void SettingsDialog::onResetClicked() {
   m_autoStartOnLoginCheckBox->setChecked(false);
   m_minimizeToTrayCheckBox->setChecked(true);
   m_darkThemeCheckBox->setChecked(false);
-  m_darkThemeCheckBox->setChecked(false);
-  // m_autoTranslateCheckBox->setChecked(false);
 
-  // Reset Resources tab
   m_startupLastUsedRadio->setChecked(true);
-
-  applySettings();
 }
 
 void SettingsDialog::onOpacityChanged(int value) { emit testOpacity(value); }
-
-int SettingsDialog::stringToKeyCode(const QString &text) {
-  if (text.isEmpty())
-    return -1;
-
-  bool ok;
-  int keyCode = text.toInt(&ok);
-  if (ok && keyCode >= 0 && keyCode <= 255) {
-    return keyCode;
-  }
-
-  if (text.length() == 1) {
-    QChar ch = text.at(0).toUpper();
-    if (ch >= 'A' && ch <= 'Z')
-      return ch.unicode();
-    if (ch >= '0' && ch <= '9')
-      return ch.unicode();
-  }
-
-  return -1;
-}

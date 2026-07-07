@@ -1,5 +1,6 @@
 #pragma once
 #include "../models/WebResource.h"
+#include <QUrl>
 #include <QWebEnginePage>
 #include <QWebEngineView>
 
@@ -9,15 +10,18 @@ class WebViewContainer : public QWebEngineView {
 public:
   explicit WebViewContainer(QWidget *parent = nullptr);
 
+  void loadResource(const WebResource &resource);
   void insertText(const QString &text);
   void insertAltText(const QString &text);
   void reloadPage();
   bool isLoading() const;
   void applyWebViewTheme(bool darkTheme);
 
+  QString getResourceId() const { return m_resourceId; }
+  QUrl resourceUrl() const { return m_resourceUrl; }
+
 signals:
   void pageLoaded(bool success);
-  void loadError(const QString &error);
   void zoomChanged(const QString &resourceId, double zoomFactor);
 
 protected:
@@ -27,24 +31,17 @@ protected:
 
 private slots:
   void onLoadFinished(bool ok);
-  void onLoadProgress(int progress);
   void onRenderProcessTerminated(
       QWebEnginePage::RenderProcessTerminationStatus status, int exitCode);
 
-public:
-  void loadResource(const WebResource &resource);
-  void executeScript(const QString &script);
-  QString getResourceId() const { return m_resourceId; }
-
 private:
-  void injectJavaScript(const QString &script);
-  void waitForPageLoad();
+  void runOpenScript(bool alt, const QString &text);
+  void showErrorPage(const QString &message);
 
-  bool m_darkThemeEnabled;
-  bool m_darkThemeApplied;
+  bool m_darkThemeEnabled = false;
+  bool m_hasLoadedOk = false;
+  int m_crashCount = 0;
 
   QString m_resourceId;
-  QString m_openScript;
-  QString m_altOpenScript;
-  QString m_initScript;
+  QUrl m_resourceUrl;
 };

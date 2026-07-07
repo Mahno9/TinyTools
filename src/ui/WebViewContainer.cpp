@@ -1,4 +1,5 @@
 #include "WebViewContainer.h"
+#include "../app/Logging.h"
 #include "../models/ResourceManager.h"
 #include <QApplication>
 #include <QChildEvent>
@@ -8,14 +9,17 @@
 #include <QJsonDocument>
 #include <QStandardPaths>
 #include <QTimer>
-#include <QWebEnginePage>
 #include <QWebEngineProfile>
 #include <QWebEngineScript>
 #include <QWebEngineScriptCollection>
 #include <QWebEngineSettings>
 #include <QWheelEvent>
 
-// Custom QWebEnginePage to capture console logs
+namespace {
+constexpr int MAX_CRASH_RELOADS = 3;
+
+// Custom QWebEnginePage to capture console logs (debug builds/runs only -
+// page console output can contain page data and must not land in user logs).
 class LoggingWebEnginePage : public QWebEnginePage {
 public:
   explicit LoggingWebEnginePage(QWebEngineProfile *profile,
@@ -26,55 +30,40 @@ protected:
   void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
                                 const QString &message, int lineNumber,
                                 const QString &sourceID) override {
-    QString levelStr;
-    switch (level) {
-    case InfoMessageLevel:
-      levelStr = "INFO";
-      break;
-    case WarningMessageLevel:
-      levelStr = "WARN";
-      break;
-    case ErrorMessageLevel:
-      levelStr = "ERROR";
-      break;
-    default:
-      levelStr = "LOG";
-      break;
-    }
+    if (!Logging::isDebugEnabled())
+      return;
     qDebug().noquote() << QString("[JS][%1] %2 (%3:%4)")
-                              .arg(levelStr, message, sourceID,
+                              .arg(int(level))
+                              .arg(message, sourceID,
                                    QString::number(lineNumber));
   }
 };
 
 // Static persistent profile shared across all WebViewContainers
-static QWebEngineProfile *getPersistentProfile() {
+QWebEngineProfile *getPersistentProfile() {
   static QWebEngineProfile *profile = nullptr;
   if (!profile) {
-    // Create persistent profile with storage path
     QString storagePath =
         QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
     // Parent to qApp so Qt destroys the profile when QApplication exits.
-    // MainWindow (and its WebViewContainers/pages) is deleted by Application::~Application()
-    // before QApplication runs its children cleanup, ensuring correct destruction order.
+    // MainWindow (and its WebViewContainers/pages) is deleted by
+    // Application::~Application() before QApplication runs its children
+    // cleanup, ensuring correct destruction order.
     profile = new QWebEngineProfile("TinyTools", qApp);
     profile->setPersistentStoragePath(storagePath + "/WebEngineData");
     profile->setCachePath(storagePath + "/WebEngineCache");
     profile->setPersistentCookiesPolicy(
         QWebEngineProfile::AllowPersistentCookies);
-    qDebug() << "Created persistent WebEngine profile at:" << storagePath;
   }
   return profile;
 }
+} // namespace
 
-WebViewContainer::WebViewContainer(QWidget *parent)
-    : QWebEngineView(parent), m_darkThemeEnabled(false),
-      m_darkThemeApplied(false) {
+WebViewContainer::WebViewContainer(QWidget *parent) : QWebEngineView(parent) {
   // Configure page with persistent profile for cookie/auth persistence
   QWebEnginePage *page = new LoggingWebEnginePage(getPersistentProfile(), this);
   setPage(page);
 
-  // Configure page settings for performance
   QWebEngineSettings *settings = page->settings();
   settings->setAttribute(QWebEngineSettings::JavascriptEnabled, true);
   settings->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows, false);
@@ -89,11 +78,8 @@ WebViewContainer::WebViewContainer(QWidget *parent)
   settings->setAttribute(QWebEngineSettings::JavascriptCanAccessClipboard,
                          false);
 
-  // Connect signals
   connect(page, &QWebEnginePage::loadFinished, this,
           &WebViewContainer::onLoadFinished);
-  connect(page, &QWebEnginePage::loadProgress, this,
-          &WebViewContainer::onLoadProgress);
   connect(page, &QWebEnginePage::renderProcessTerminated, this,
           &WebViewContainer::onRenderProcessTerminated);
 
@@ -104,178 +90,153 @@ WebViewContainer::WebViewContainer(QWidget *parent)
 }
 
 void WebViewContainer::loadResource(const WebResource &resource) {
-  qDebug() << "WebViewContainer::loadResource() - ENTRY";
-  qDebug() << "  Name:" << resource.name;
-  qDebug() << "  URL String:" << resource.url;
-
   m_resourceId = resource.id;
-  m_openScript = resource.openScript;
-  m_altOpenScript = resource.altOpenScript;
-  m_initScript = resource.initScript;
-
-  // Apply zoom factor
   setZoomFactor(resource.zoomFactor);
-  qDebug() << "  Zoom factor:" << resource.zoomFactor;
 
-  QUrl url(resource.url);
-  if (!url.isValid()) {
-    qWarning() << "  WARNING: URL is invalid!";
-    emit loadError("Invalid URL");
+  if (!resource.isValid()) {
+    qWarning() << "Refusing to load invalid resource:" << resource.url;
+    m_resourceUrl.clear();
+    showErrorPage(tr("Invalid URL: %1").arg(resource.url));
     return;
   }
-  QString scheme = url.scheme().toLower();
-  if (scheme != QLatin1String("http") && scheme != QLatin1String("https")) {
-    qWarning() << "  Blocked load of non-http(s) URL:" << resource.url;
-    emit loadError("Invalid URL scheme: only http/https allowed");
-    return;
-  }
-  qDebug() << "  Parsed QUrl scheme:" << url.scheme();
-  qDebug() << "  Parsed QUrl host:" << url.host();
 
-  qInfo() << "Triggering load(QUrl)...";
-  load(url);
-  qDebug() << "WebViewContainer::loadResource() - EXIT";
-}
+  m_resourceUrl = QUrl(resource.url);
+  m_hasLoadedOk = false;
+  m_crashCount = 0;
 
-void WebViewContainer::executeScript(const QString &script) {
-  if (script.isEmpty())
-    return;
-  injectJavaScript(script);
+  qInfo() << "Loading resource:" << resource.name << m_resourceUrl.toString();
+  load(m_resourceUrl);
 }
 
 void WebViewContainer::insertText(const QString &text) {
+  runOpenScript(false, text);
+}
+
+void WebViewContainer::insertAltText(const QString &text) {
+  runOpenScript(true, text);
+}
+
+void WebViewContainer::runOpenScript(bool alt, const QString &text) {
   if (isLoading()) {
     qWarning() << "Cannot execute open script: page is loading";
     return;
   }
 
-  // Get fresh script from ResourceManager
+  // Always fetch the current script from ResourceManager so edits in the
+  // settings dialog take effect without recreating the view.
   WebResource resource =
       ResourceManager::instance()->getResourceById(m_resourceId);
-  QString openScript = resource.isValid() ? resource.openScript : m_openScript;
-
-  if (openScript.isEmpty()) {
-    qDebug() << "No open script defined for this resource";
+  if (!resource.isValid()) {
     return;
   }
-
-  qDebug() << "Executing open script with text length:" << text.length();
+  const QString script = alt ? resource.altOpenScript : resource.openScript;
+  if (script.isEmpty()) {
+    return;
+  }
 
   // Safely escape the text by wrapping in a JSON array
   QJsonArray jsonArray;
   jsonArray.append(text);
   QString safeJson = QJsonDocument(jsonArray).toJson(QJsonDocument::Compact);
-
-  // Inject the text into a global variable first
   QString code = QString("window.tinyToolsClipboard = %1[0];").arg(safeJson);
 
-  // Execute variable injection, then user script
-  // We use a lambda callback to ensure sequential execution
-  page()->runJavaScript(code, [this, openScript](const QVariant &) {
-    injectJavaScript(openScript);
+  // Inject the clipboard global, run the user script, then schedule cleanup
+  // so page scripts cannot read the injected text indefinitely. The delay
+  // gives async user scripts (waiting for elements etc.) a grace period.
+  page()->runJavaScript(code, [this, script](const QVariant &) {
+    page()->runJavaScript(script, [this](const QVariant &) {
+      page()->runJavaScript(
+          "setTimeout(function(){"
+          " try { delete window.tinyToolsClipboard; } catch(e) {}"
+          "}, 5000);");
+    });
   });
 }
 
-void WebViewContainer::insertAltText(const QString &text) {
-  if (isLoading()) {
-    qWarning() << "Cannot execute alt script: page is loading";
-    return;
+void WebViewContainer::reloadPage() {
+  if (m_resourceUrl.isValid() && url().scheme() != QLatin1String("http") &&
+      url().scheme() != QLatin1String("https")) {
+    // Currently showing an internal error page: navigate back to the resource.
+    load(m_resourceUrl);
+  } else {
+    reload();
   }
-
-  // Get fresh script from ResourceManager
-  WebResource resource =
-      ResourceManager::instance()->getResourceById(m_resourceId);
-  QString altScript =
-      resource.isValid() ? resource.altOpenScript : m_altOpenScript;
-
-  if (altScript.isEmpty()) {
-    qDebug() << "No alternative open script defined for this resource";
-    return;
-  }
-
-  qDebug() << "Executing alternative open script with text length:"
-           << text.length();
-
-  // Same logic for Alt script
-  QJsonArray jsonArray;
-  jsonArray.append(text);
-  QString safeJson = QJsonDocument(jsonArray).toJson(QJsonDocument::Compact);
-  QString code = QString("window.tinyToolsClipboard = %1[0];").arg(safeJson);
-
-  page()->runJavaScript(code, [this, altScript](const QVariant &) {
-    injectJavaScript(altScript);
-  });
 }
-
-void WebViewContainer::reloadPage() { reload(); }
 
 bool WebViewContainer::isLoading() const {
   return page() && page()->isLoading();
 }
 
 void WebViewContainer::onLoadFinished(bool ok) {
+  const bool isResourcePage = url().scheme() == QLatin1String("http") ||
+                              url().scheme() == QLatin1String("https");
+
   if (ok) {
-    qDebug() << "Page loaded successfully";
     emit pageLoaded(true);
+    if (!isResourcePage) {
+      return; // Internal error page: no theme/init script needed.
+    }
+    m_hasLoadedOk = true;
+    m_crashCount = 0;
 
     // Apply dark theme preference to the page
     applyWebViewTheme(m_darkThemeEnabled);
 
-    if (!m_initScript.isEmpty()) {
-      qDebug() << "Executing initialization script...";
-      injectJavaScript(m_initScript);
+    WebResource resource =
+        ResourceManager::instance()->getResourceById(m_resourceId);
+    if (resource.isValid() && !resource.initScript.isEmpty()) {
+      page()->runJavaScript(resource.initScript);
     }
   } else {
-    qWarning() << "Page load failed";
-    emit loadError("Failed to load resource page");
+    qWarning() << "Page load failed:" << m_resourceUrl.toString();
     emit pageLoaded(false);
-  }
-}
-
-void WebViewContainer::onLoadProgress(int progress) {
-  if (progress % 25 == 0) {
-    qDebug() << "Loading progress:" << progress << "%";
+    // loadFinished(false) also fires for aborted navigations on an already
+    // rendered page; only replace content that never loaded successfully.
+    if (!m_hasLoadedOk) {
+      showErrorPage(tr("Failed to load %1").arg(m_resourceUrl.toString()));
+    }
   }
 }
 
 void WebViewContainer::onRenderProcessTerminated(
     QWebEnginePage::RenderProcessTerminationStatus status, int exitCode) {
-  Q_UNUSED(exitCode);
-
-  QString reason;
-  switch (status) {
-  case QWebEnginePage::NormalTerminationStatus:
-    reason = "Normal termination";
-    break;
-  case QWebEnginePage::AbnormalTerminationStatus:
-    reason = "Abnormal termination";
-    break;
-  case QWebEnginePage::CrashedTerminationStatus:
-    reason = "Render process crashed";
-    break;
-  case QWebEnginePage::KilledTerminationStatus:
-    reason = "Render process killed";
-    break;
+  if (status == QWebEnginePage::NormalTerminationStatus) {
+    return;
   }
 
-  qCritical() << "Render process terminated:" << reason;
-  emit loadError(reason);
+  qCritical() << "Render process terminated, status:" << status
+              << "exit code:" << exitCode;
 
-  // Attempt to reload
-  QTimer::singleShot(1000, this, &WebViewContainer::reload);
+  m_hasLoadedOk = false;
+  ++m_crashCount;
+  if (m_crashCount <= MAX_CRASH_RELOADS) {
+    // Exponential-ish backoff: 1s, 2s, 3s.
+    QTimer::singleShot(1000 * m_crashCount, this, &QWebEngineView::reload);
+  } else {
+    showErrorPage(tr("The page crashed repeatedly."));
+  }
 }
 
-void WebViewContainer::injectJavaScript(const QString &script) {
-  if (!page())
-    return;
+void WebViewContainer::showErrorPage(const QString &message) {
+  const QString retryHref =
+      m_resourceUrl.isValid() ? m_resourceUrl.toString().toHtmlEscaped()
+                              : QString();
+  const QString retryLink =
+      retryHref.isEmpty()
+          ? QString()
+          : QString("<p><a style='color:#4da3ff' href=\"%1\">Retry</a></p>")
+                .arg(retryHref);
 
-  page()->runJavaScript(script, [this](const QVariant &result) {
-    // Optional: handle result
-  });
-}
-
-void WebViewContainer::waitForPageLoad() {
-  // No-op
+  const QString html =
+      QString("<html><body style='margin:0;font-family:sans-serif;"
+              "background:%1;color:%2;display:flex;align-items:center;"
+              "justify-content:center;height:100vh'>"
+              "<div style='text-align:center'><h2>%3</h2>%4</div>"
+              "</body></html>")
+          .arg(m_darkThemeEnabled ? "#2b2b2b" : "#f5f5f5",
+               m_darkThemeEnabled ? "#dddddd" : "#333333",
+               message.toHtmlEscaped(), retryLink);
+  setHtml(html);
 }
 
 void WebViewContainer::contextMenuEvent(QContextMenuEvent *event) {
@@ -302,7 +263,7 @@ void WebViewContainer::applyWebViewTheme(bool darkTheme) {
     (function() {
       const isDark = %1;
       const colorScheme = isDark ? 'dark' : 'light';
-      
+
       // Override matchMedia for prefers-color-scheme queries
       const originalMatchMedia = window.matchMedia.bind(window);
       Object.defineProperty(window, 'matchMedia', {
@@ -335,8 +296,6 @@ void WebViewContainer::applyWebViewTheme(bool darkTheme) {
         writable: false,
         configurable: false
       });
-      
-      console.log('[TinyTools] Color scheme preference applied:', colorScheme);
     })();
   )")
                              .arg(darkTheme ? "true" : "false");
@@ -350,8 +309,6 @@ void WebViewContainer::applyWebViewTheme(bool darkTheme) {
   script.setRunsOnSubFrames(true);
 
   scripts.insert(script);
-
-  qDebug() << "WebView theme script installed, dark mode:" << darkTheme;
 }
 
 bool WebViewContainer::eventFilter(QObject *obj, QEvent *event) {
@@ -362,10 +319,8 @@ bool WebViewContainer::eventFilter(QObject *obj, QEvent *event) {
       double currentZoom = zoomFactor();
 
       if (wheelEvent->angleDelta().y() > 0) {
-        // Scroll up - zoom in
         currentZoom = qMin(currentZoom + step, 3.0);
       } else {
-        // Scroll down - zoom out
         currentZoom = qMax(currentZoom - step, 0.3);
       }
 

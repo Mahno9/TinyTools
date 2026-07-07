@@ -2,24 +2,38 @@
 #include "../../src/models/AppConfig.h"
 #include "../../src/core/HotkeyManager.h"
 #include <QDir>
+#include <QFile>
+#include <QFileInfo>
 #include <QStandardPaths>
 
 class TestConfig : public QObject {
     Q_OBJECT
 
 private slots:
+    void initTestCase();
     void init();
     void cleanup();
     void testDefaultValues();
     void testSetAndGetValues();
     void testSaveAndLoad();
+    void testHotkeyRoundTrip();
+    void testValueBounds();
+    void testCorruptConfigIsBackedUp();
     void testRegistryPathIsQuoted();
     void testNoStaleDataAfterReset();
 };
 
+void TestConfig::initTestCase() {
+    // Isolate from the user's real %APPDATA%: all QStandardPaths locations
+    // point into a test directory for the whole test run.
+    QStandardPaths::setTestModeEnabled(true);
+}
+
 void TestConfig::init() {
-    // Reset singleton to a clean state before each test
+    // Reset singleton and remove any config file from a previous test
     AppConfig::cleanupInstance();
+    QFile::remove(AppConfig::instance()->getConfigFilePath());
+    QFile::remove(AppConfig::instance()->getConfigFilePath() + ".bak");
     AppConfig::instance()->resetToDefaults();
 }
 
@@ -80,6 +94,67 @@ void TestConfig::testSaveAndLoad() {
 
     QCOMPARE(config2->getAlwaysOnTop(), false);
     QCOMPARE(config2->getWindowOpacity(), 80);
+}
+
+void TestConfig::testHotkeyRoundTrip() {
+    AppConfig *config = AppConfig::instance();
+
+    const Qt::KeyboardModifiers mods =
+        Qt::ControlModifier | Qt::ShiftModifier | Qt::MetaModifier;
+    config->setHotkey(HotkeyType::AlternativeToggle, Qt::Key_F9, mods);
+    QVERIFY(config->save());
+
+    AppConfig::cleanupInstance();
+    AppConfig *config2 = AppConfig::instance();
+    QVERIFY(config2->load());
+
+    QCOMPARE(config2->getHotkeyKey(HotkeyType::AlternativeToggle),
+             static_cast<int>(Qt::Key_F9));
+    QCOMPARE(config2->getHotkeyModifiers(HotkeyType::AlternativeToggle), mods);
+}
+
+void TestConfig::testValueBounds() {
+    AppConfig *config = AppConfig::instance();
+
+    config->setWindowOpacity(150);
+    QCOMPARE(config->getWindowOpacity(), 100);
+    config->setWindowOpacity(5);
+    QCOMPARE(config->getWindowOpacity(), 20);
+
+    config->setWindowWidth(10000);
+    QCOMPARE(config->getWindowWidth(), 1920);
+    config->setWindowWidth(10);
+    QCOMPARE(config->getWindowWidth(), 400);
+
+    config->setWindowHeight(10000);
+    QCOMPARE(config->getWindowHeight(), 1080);
+    config->setWindowHeight(10);
+    QCOMPARE(config->getWindowHeight(), 300);
+}
+
+void TestConfig::testCorruptConfigIsBackedUp() {
+    AppConfig *config = AppConfig::instance();
+    const QString path = config->getConfigFilePath();
+    const QString backup = path + ".bak";
+
+    // Write garbage where the config should be
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    {
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("{ this is not : valid json ");
+    }
+
+    // load() must fail, move the corrupt file aside, and keep defaults
+    QVERIFY(!config->load());
+    QVERIFY(!QFile::exists(path));
+    QVERIFY(QFile::exists(backup));
+    QCOMPARE(config->getWindowOpacity(), 90); // defaults intact
+
+    // A subsequent save must produce a loadable file again
+    QVERIFY(config->save());
+    AppConfig::cleanupInstance();
+    QVERIFY(AppConfig::instance()->load());
 }
 
 void TestConfig::testRegistryPathIsQuoted() {

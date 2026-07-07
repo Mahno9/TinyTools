@@ -165,6 +165,15 @@ void ResourceManager::clearAllResources() {
     emit resourcesChanged();
 }
 
+void ResourceManager::setResourceZoom(const QString& id, double zoomFactor) {
+    for (auto& resource : m_resources) {
+        if (resource.id == id) {
+            resource.zoomFactor = zoomFactor;
+            return;
+        }
+    }
+}
+
 ResourceManager::StartupMode ResourceManager::getStartupMode() const {
     return m_startupMode;
 }
@@ -218,160 +227,151 @@ WebResource ResourceManager::getStartupResource() const {
     return resource;
 }
 
-bool ResourceManager::importPresets(const QString& filePath) {
+QList<WebResource> ResourceManager::parsePresets(const QString& filePath,
+                                                 QString* errorOut) {
+    QList<WebResource> result;
+
     QFile file(filePath);
     if (!file.open(QIODevice::ReadOnly)) {
-        qWarning() << "Cannot open file for import:" << filePath;
-        return false;
+        if (errorOut) *errorOut = QStringLiteral("Cannot open file: %1").arg(filePath);
+        return result;
     }
-    
-    QByteArray data = file.readAll();
-    file.close();
-    
-    QJsonParseError error;
-    QJsonDocument doc = QJsonDocument::fromJson(data, &error);
-    
-    if (error.error != QJsonParseError::NoError) {
-        qWarning() << "JSON parse error during import:" << error.errorString();
-        return false;
-    }
-    
-    QJsonArray resourcesArray = doc.object()["resources"].toArray();
-    int importedCount = 0;
-    
-    for (const QJsonValue& value : resourcesArray) {
-        if (m_resources.size() >= Constants::MAX_RESOURCES) {
-            qWarning() << "Import cap reached at" << Constants::MAX_RESOURCES << "resources — skipping remainder";
-            break;
-        }
 
+    QJsonParseError error;
+    QJsonDocument doc = QJsonDocument::fromJson(file.readAll(), &error);
+    file.close();
+
+    if (error.error != QJsonParseError::NoError) {
+        if (errorOut) *errorOut = QStringLiteral("JSON parse error: %1").arg(error.errorString());
+        return result;
+    }
+
+    const QJsonArray resourcesArray = doc.object()["resources"].toArray();
+    for (const QJsonValue& value : resourcesArray) {
         WebResource resource = WebResource::fromJson(value.toObject());
 
-        // Generate new ID to avoid conflicts (append mode)
+        // Always regenerate the ID: presets may collide with existing
+        // resources or contain duplicate ids within the file.
         resource.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
-        resource.order = m_resources.size(); // Add at end
 
-        // isValid() enforces http/https scheme — rejects file:// and javascript: URLs
+        // isValid() enforces http/https scheme with a host - rejects
+        // file:// and javascript: URLs.
         if (resource.isValid()) {
-            m_resources.append(resource);
-            emit resourceAdded(resource.id);
-            importedCount++;
+            result.append(resource);
         } else {
             qWarning() << "Skipping imported resource with invalid URL:" << resource.url;
         }
     }
-    
-    if (importedCount > 0) {
-        emit resourcesChanged();
-        qInfo() << "Imported" << importedCount << "resources from" << filePath;
-    }
-    
-    return importedCount > 0;
+    return result;
 }
 
-bool ResourceManager::exportPresets(const QString& filePath) const {
+bool ResourceManager::writePresets(const QString& filePath,
+                                   const QList<WebResource>& resources) {
     QJsonArray resourcesArray;
-    
-    for (const auto& resource : m_resources) {
+    for (const auto& resource : resources) {
         resourcesArray.append(resource.toJson());
     }
-    
+
     QJsonObject root;
     root["version"] = "1.0";
     root["resources"] = resourcesArray;
-    
-    QJsonDocument doc(root);
-    
+
     QFile file(filePath);
     if (!file.open(QIODevice::WriteOnly)) {
         qWarning() << "Cannot open file for export:" << filePath;
         return false;
     }
-    
-    file.write(doc.toJson(QJsonDocument::Indented));
+    file.write(QJsonDocument(root).toJson(QJsonDocument::Indented));
     file.close();
-    
-    qInfo() << "Exported" << m_resources.size() << "resources to" << filePath;
+
+    qInfo() << "Exported" << resources.size() << "resources to" << filePath;
     return true;
 }
 
+bool ResourceManager::importPresets(const QString& filePath) {
+    QString error;
+    const QList<WebResource> parsed = parsePresets(filePath, &error);
+    if (!error.isEmpty()) {
+        qWarning() << "Import failed:" << error;
+        return false;
+    }
+
+    int importedCount = 0;
+    for (WebResource resource : parsed) {
+        if (m_resources.size() >= Constants::MAX_RESOURCES) {
+            qWarning() << "Import cap reached at" << Constants::MAX_RESOURCES
+                       << "resources - skipping remainder";
+            break;
+        }
+        resource.order = m_resources.size(); // Add at end
+        m_resources.append(resource);
+        emit resourceAdded(resource.id);
+        importedCount++;
+    }
+
+    if (importedCount > 0) {
+        emit resourcesChanged();
+        qInfo() << "Imported" << importedCount << "resources from" << filePath;
+    }
+
+    return importedCount > 0;
+}
+
+bool ResourceManager::exportPresets(const QString& filePath) const {
+    return writePresets(filePath, m_resources);
+}
+
 bool ResourceManager::loadFromConfig() {
-    qDebug() << "ResourceManager::loadFromConfig() - ENTRY";
     AppConfig* config = AppConfig::instance();
     QJsonObject configObj = config->getConfigObject();
-    
-    // Load resources
+
     QJsonArray resourcesArray = configObj["resources"].toArray();
-    qDebug() << "Found" << resourcesArray.size() << "resource resources in config JSON";
-    
     m_resources.clear();
-    
+
     for (int i = 0; i < resourcesArray.size(); ++i) {
-        QJsonValue value = resourcesArray.at(i);
-        QJsonObject resObj = value.toObject();
-        WebResource resource = WebResource::fromJson(resObj);
-        
-        qDebug() << "Loading resource candidate:" << i 
-                 << "ID:" << resource.id 
-                 << "Name:" << resource.name
-                 << "URL:" << resource.url;
-                 
+        WebResource resource = WebResource::fromJson(resourcesArray.at(i).toObject());
         if (resource.isValid()) {
             m_resources.append(resource);
-            qDebug() << "Resource loaded successfully";
         } else {
-            qWarning() << "Skipping invalid resource at index" << i;
+            qWarning() << "Skipping invalid resource at index" << i
+                       << "URL:" << resource.url;
         }
     }
-    
+
     // Sort by order
     std::sort(m_resources.begin(), m_resources.end());
-    
+
     // Load startup settings
     QJsonObject startup = configObj["startup"].toObject();
     QString modeStr = startup["mode"].toString("lastUsed");
     m_startupMode = (modeStr == "selected") ? SelectedResource : LastUsed;
     m_defaultResourceId = startup["defaultResourceId"].toString();
     m_lastUsedResourceId = startup["lastUsedResourceId"].toString();
-    
+
     qInfo() << "Loaded" << m_resources.size() << "resources from config";
-    qDebug() << "ResourceManager::loadFromConfig() - EXIT";
     return true;
 }
 
 bool ResourceManager::saveToConfig() {
-    qDebug() << "ResourceManager::saveToConfig() - ENTRY";
     AppConfig* config = AppConfig::instance();
     QJsonObject configObj = config->getConfigObject();
-    
-    // Save resources
+
     QJsonArray resourcesArray;
-    qDebug() << "Serializing" << m_resources.size() << "resources...";
-    
     for (const auto& resource : m_resources) {
         if (resource.isValid()) {
             resourcesArray.append(resource.toJson());
-            qDebug() << "Serialized resource:" << resource.name << "(" << resource.id << ")";
         } else {
             qWarning() << "Skipping invalid resource during save:" << resource.id;
         }
     }
     configObj["resources"] = resourcesArray;
-    qDebug() << "Updated config object with" << resourcesArray.size() << "resources";
-    
-    // Save startup settings
+
     QJsonObject startup;
     startup["mode"] = (m_startupMode == SelectedResource) ? "selected" : "lastUsed";
     startup["defaultResourceId"] = m_defaultResourceId;
     startup["lastUsedResourceId"] = m_lastUsedResourceId;
     configObj["startup"] = startup;
-    
+
     config->setConfigObject(configObj);
-    
-    qDebug() << "Triggering AppConfig::save()...";
-    bool result = config->save();
-    qDebug() << "AppConfig::save() returned:" << result;
-    
-    qDebug() << "ResourceManager::saveToConfig() - EXIT";
-    return result;
+    return config->save();
 }

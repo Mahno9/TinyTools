@@ -7,7 +7,6 @@
 class MainWindow;
 class TrayIcon;
 class ClipboardManager;
-class NetworkMonitor;
 
 class Application : public QObject {
   Q_OBJECT
@@ -20,20 +19,19 @@ public:
 
 private slots:
   void onHotkeyPressed(int type);
-  void onNetworkStatusChanged(bool online);
   void onSettingsChanged();
 
 private:
   void setupComponents();
   void connectSignals();
-  void registerAllHotkeys();
-  void updateAllHotkeys();
+  QStringList registerAllHotkeys();
+  QStringList updateAllHotkeys();
+  void notifyHotkeyFailures(const QStringList &failed);
 
   QPointer<MainWindow> m_mainWindow;
   QPointer<TrayIcon> m_trayIcon;
   QPointer<HotkeyManager> m_hotkeyManager;
   QPointer<ClipboardManager> m_clipboardManager;
-  QPointer<NetworkMonitor> m_networkMonitor;
 
   Q_DISABLE_COPY(Application)
 };

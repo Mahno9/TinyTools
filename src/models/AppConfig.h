@@ -61,11 +61,7 @@ public:
     
     bool getDarkTheme() const;
     void setDarkTheme(bool value);
-    
-    // Translation settings
-    bool getAutoTranslate() const;
-    void setAutoTranslate(bool value);
-    
+
     // Raw config access (for ResourceManager)
     QJsonObject getConfigObject() const;
     void setConfigObject(const QJsonObject& config);

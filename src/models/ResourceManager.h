@@ -44,6 +44,10 @@ public:
     void updateResource(const WebResource& resource);
     void reorderResources(const QStringList& orderedIds);
     void clearAllResources();
+
+    // Updates only the zoom factor, without emitting resourcesChanged.
+    // Used by Ctrl+wheel so per-tick zoom does not rebuild the tab bar.
+    void setResourceZoom(const QString& id, double zoomFactor);
     
     // Startup behavior
     StartupMode getStartupMode() const;
@@ -63,6 +67,13 @@ public:
     // Preset import/export (append mode for import)
     bool importPresets(const QString& filePath);
     bool exportPresets(const QString& filePath) const;
+
+    // Parses a preset file into valid resources (invalid URLs dropped, ids
+    // regenerated). Returns an empty list and sets errorOut on parse failure.
+    static QList<WebResource> parsePresets(const QString& filePath,
+                                           QString* errorOut = nullptr);
+    static bool writePresets(const QString& filePath,
+                             const QList<WebResource>& resources);
     
     // Persistence
     bool loadFromConfig();

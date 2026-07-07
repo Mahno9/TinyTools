@@ -6,17 +6,15 @@
 #include "SettingsDialog.h"
 #include "WebViewContainer.h"
 #include <QAction>
+#include <QApplication>
 #include <QCloseEvent>
 #include <QDebug>
 #include <QGuiApplication>
 #include <QHBoxLayout>
-#include <QLabel>
+#include <QKeyEvent>
 #include <QMenu>
-#include <QMessageBox>
-#include <QMouseEvent>
 #include <QPushButton>
 #include <QScreen>
-#include <QSettings>
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QTimer>
@@ -28,36 +26,34 @@
 #endif
 
 MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
-    : QMainWindow(parent), m_clipboardManager(clipboardManager),
-      m_dragging(false), m_resizing(false), m_resizeEdge(Qt::Edges()) {
-  qDebug() << "MainWindow::MainWindow() - ENTRY";
+    : QMainWindow(parent), m_clipboardManager(clipboardManager) {
+  AppConfig *config = AppConfig::instance();
 
   setupUI();
-  setupWindowFlags();
+  setupWindowFlags(config->getAlwaysOnTop());
   setupWebView();
 
-  // Load window configuration — config already loaded by Application::initialize()
-  AppConfig *config = AppConfig::instance();
   resize(config->getWindowWidth(), config->getWindowHeight());
   move(config->getWindowX(), config->getWindowY());
   setWindowOpacity(config->getWindowOpacity() / 100.0);
-  if (config->getAlwaysOnTop()) {
-    setWindowFlags(windowFlags() | Qt::WindowStaysOnTopHint);
-  }
+  applyWebViewTheme(config->getDarkTheme());
 
   // Connect to ResourceManager signals
-  connect(ResourceManager::instance(), &ResourceManager::resourcesChanged,
-          this, &MainWindow::refreshResources);
-  connect(ResourceManager::instance(),
-          &ResourceManager::activeResourceChanged, this,
+  ResourceManager *rm = ResourceManager::instance();
+  connect(rm, &ResourceManager::resourcesChanged, this,
+          &MainWindow::refreshResources);
+  connect(rm, &ResourceManager::activeResourceChanged, this,
           &MainWindow::switchToResourceById);
+  connect(rm, &ResourceManager::resourceRemoved, this,
+          &MainWindow::onResourceRemoved);
+  connect(rm, &ResourceManager::resourceUpdated, this,
+          &MainWindow::onResourceUpdated);
 
   // Initialize resources
   refreshResources();
 
   // Set initial resource based on startup settings
-  WebResource startupResource =
-      ResourceManager::instance()->getStartupResource();
+  WebResource startupResource = rm->getStartupResource();
   if (startupResource.isValid()) {
     switchToResourceById(startupResource.id);
   } else if (!m_tabResourceIds.isEmpty()) {
@@ -65,51 +61,9 @@ MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
   }
 }
 
-void MainWindow::onTabContextMenuRequested(const QPoint &pos) {
-  int index = m_tabBar->tabAt(pos);
-  if (index != -1) {
-    QMenu menu(this);
-    QAction *refreshAction = menu.addAction("Refresh");
-    connect(refreshAction, &QAction::triggered, this, [this, index]() {
-      if (index >= 0 && index < m_tabResourceIds.size()) {
-        reloadResource(m_tabResourceIds[index]);
-      }
-    });
-    menu.exec(m_tabBar->mapToGlobal(pos));
-  }
-}
+MainWindow::~MainWindow() { saveGeometryToConfig(); }
 
-void MainWindow::onRefreshTriggered() {
-  if (!m_currentResourceId.isEmpty()) {
-    reloadResource(m_currentResourceId);
-  }
-}
-
-void MainWindow::reloadResource(const QString &resourceId) {
-  QString id = resourceId;
-  if (id.isEmpty()) {
-    id = m_currentResourceId;
-  }
-
-  if (id.isEmpty())
-    return;
-
-  if (m_resourceViews.contains(id)) {
-    qDebug() << "Reloading resource:" << id;
-    m_resourceViews[id]->reloadPage();
-  } else {
-    // If not loaded yet and we are reloading the CURRENT one, load it.
-    // If it's a background tab, we might skip loading it until switched to,
-    // but the user explicitly asked for a refresh, so maybe force load?
-    // For now, if it's the current one, loadCurrentResource() will do.
-    if (id == m_currentResourceId) {
-      loadCurrentResource();
-    }
-  }
-}
-
-MainWindow::~MainWindow() {
-  // Save window state
+void MainWindow::saveGeometryToConfig() {
   AppConfig *config = AppConfig::instance();
   config->setWindowWidth(width());
   config->setWindowHeight(height());
@@ -128,7 +82,6 @@ void MainWindow::setupUI() {
   // Custom Title Bar (Drag Handle)
   m_dragHandle = new QWidget(this);
   m_dragHandle->setFixedHeight(30);
-  m_dragHandle->setStyleSheet("background-color: #2b2b2b;");
 
   QHBoxLayout *dragHandleLayout = new QHBoxLayout(m_dragHandle);
   dragHandleLayout->setContentsMargins(0, 0, 5, 0);
@@ -137,10 +90,6 @@ void MainWindow::setupUI() {
   // Settings Button
   m_settingsButton = new QPushButton("⚙", m_dragHandle);
   m_settingsButton->setFixedSize(30, 30);
-  m_settingsButton->setStyleSheet(
-      "QPushButton { background-color: transparent; color: #fff; border: none; "
-      "font-size: 16px; }"
-      "QPushButton:hover { background-color: #3b3b3b; }");
   connect(m_settingsButton, &QPushButton::clicked, this,
           &MainWindow::onSettingsRequested);
   dragHandleLayout->addWidget(m_settingsButton);
@@ -148,18 +97,6 @@ void MainWindow::setupUI() {
   // Tab Bar for Resources
   m_tabBar = new QTabBar(m_dragHandle);
   m_tabBar->setDrawBase(false);
-  m_tabBar->setStyleSheet(
-      "QTabBar::tab { "
-      "   background: transparent; color: #aaa; padding: 5px 10px; border: "
-      "none; "
-      "   min-width: 80px; max-width: 150px; "
-      "} "
-      "QTabBar::tab:selected { "
-      "   color: #fff; background: #3b3b3b; border-bottom: 2px solid #0078d7; "
-      "} "
-      "QTabBar::tab:hover { "
-      "   background: #333; color: #fff; "
-      "}");
   connect(m_tabBar, &QTabBar::currentChanged, this, &MainWindow::onTabChanged);
 
   // Enable context menu for tabs
@@ -169,44 +106,37 @@ void MainWindow::setupUI() {
 
   dragHandleLayout->addWidget(m_tabBar);
 
-  // Initialize Refresh Action (Global Shortcut)
-  m_refreshAction = new QAction(this);
-  m_refreshAction->setText("Refresh");
-  m_refreshAction->setShortcut(QKeySequence("F5"));
+  // Refresh shortcuts (F5 / Ctrl+R)
+  m_refreshAction = new QAction("Refresh", this);
   m_refreshAction->setShortcuts({QKeySequence("F5"), QKeySequence("Ctrl+R")});
   connect(m_refreshAction, &QAction::triggered, this,
-          &MainWindow::onRefreshTriggered);
-  addAction(m_refreshAction); // Add to window to enable shortcuts
+          &MainWindow::reloadCurrentResource);
+  addAction(m_refreshAction);
 
   dragHandleLayout->addStretch();
 
   // Window Controls
   m_minimizeButton = new QPushButton("_", m_dragHandle);
   m_minimizeButton->setFixedSize(30, 30);
-  m_minimizeButton->setStyleSheet(
-      "QPushButton { background-color: transparent; color: #fff; border: none; "
-      "font-weight: bold; }"
-      "QPushButton:hover { background-color: #3b3b3b; }");
   connect(m_minimizeButton, &QPushButton::clicked, this,
-          &MainWindow::onMinimizeButtonClicked);
+          &MainWindow::showMinimized);
   dragHandleLayout->addWidget(m_minimizeButton);
 
   m_closeButton = new QPushButton("✕", m_dragHandle);
   m_closeButton->setFixedSize(30, 30);
-  m_closeButton->setStyleSheet(
-      "QPushButton { background-color: transparent; color: #fff; border: none; "
-      "}"
-      "QPushButton:hover { background-color: #e81123; }");
-  connect(m_closeButton, &QPushButton::clicked, this,
-          &MainWindow::onCloseButtonClicked);
+  // close() (not hide()) so closeEvent can honor the Minimize-to-Tray setting.
+  connect(m_closeButton, &QPushButton::clicked, this, &MainWindow::close);
   dragHandleLayout->addWidget(m_closeButton);
 
   layout->addWidget(m_dragHandle);
 }
 
-void MainWindow::setupWindowFlags() {
-  setWindowFlags(Qt::Window | Qt::FramelessWindowHint |
-                 Qt::WindowStaysOnTopHint);
+void MainWindow::setupWindowFlags(bool alwaysOnTop) {
+  Qt::WindowFlags flags = Qt::Window | Qt::FramelessWindowHint;
+  if (alwaysOnTop) {
+    flags |= Qt::WindowStaysOnTopHint;
+  }
+  setWindowFlags(flags);
   setAttribute(Qt::WA_TranslucentBackground);
   setAttribute(Qt::WA_NoSystemBackground);
 }
@@ -215,26 +145,20 @@ void MainWindow::setupWebView() {
   m_stackedWidget = new QStackedWidget(this);
   centralWidget()->layout()->addWidget(m_stackedWidget);
 
-  // m_webView will track the currently active view
+  // m_webView tracks the currently active view
   m_webView = nullptr;
-
-  if (m_clipboardManager) {
-    connect(m_clipboardManager, &ClipboardManager::clipboardChanged, this,
-            &MainWindow::onClipboardChanged);
-  }
 
   // Debounce timer: zoom saves fire only after 500ms of scroll idle
   m_zoomSaveTimer = new QTimer(this);
   m_zoomSaveTimer->setSingleShot(true);
   m_zoomSaveTimer->setInterval(500);
-
-  QTimer::singleShot(500, this, &MainWindow::applyStartupTheme);
+  connect(m_zoomSaveTimer, &QTimer::timeout, this,
+          []() { ResourceManager::instance()->saveToConfig(); });
 }
 
 void MainWindow::refreshResources() {
-  qDebug() << "MainWindow::refreshResources() - ENTRY";
-
-  if (!m_tabBar) return;  // Guard: setupUI() may not have run yet
+  if (!m_tabBar)
+    return; // Guard: setupUI() may not have run yet
 
   // Save current selection if possible
   QString previousId = m_currentResourceId;
@@ -242,49 +166,35 @@ void MainWindow::refreshResources() {
   // Block signals to prevent tab change events during rebuild
   m_tabBar->blockSignals(true);
 
-  // Store old count to check if we need to remove tabs
   while (m_tabBar->count() > 0) {
     m_tabBar->removeTab(0);
   }
   m_tabResourceIds.clear();
 
-  QList<WebResource> resources = ResourceManager::instance()->getAllResources();
-  qDebug() << "Refreshing resources, total count:" << resources.size();
-
+  const QList<WebResource> resources =
+      ResourceManager::instance()->getAllResources();
   for (const WebResource &resource : resources) {
     if (resource.isEnabled) {
       m_tabBar->addTab(resource.name);
       m_tabResourceIds.append(resource.id);
-      qDebug() << "Added tab for:" << resource.name;
-    } else {
-      qDebug() << "Skipped disabled resource:" << resource.name;
     }
   }
 
   m_tabBar->blockSignals(false);
 
   // Restore selection or select first
-  qDebug() << "Previous ID:" << previousId
-           << "New tab count:" << m_tabBar->count();
-
-  if (!previousId.isEmpty()) {
+  if (!previousId.isEmpty() && m_tabResourceIds.contains(previousId)) {
     switchToResourceById(previousId);
-    qDebug() << "Restored previous selection";
   } else if (m_tabBar->count() > 0) {
-    qDebug() << "Switching to first resource (default)...";
     switchToResource(0);
   } else {
-    qWarning() << "No enabled resources available to switch to!";
+    qWarning() << "No enabled resources available";
   }
-  qDebug() << "MainWindow::refreshResources() - EXIT";
 }
 
 void MainWindow::onTabChanged(int index) {
   if (index >= 0 && index < m_tabResourceIds.size()) {
     QString resourceId = m_tabResourceIds[index];
-    qDebug() << "Tab changed to index:" << index
-             << "Resource ID:" << resourceId;
-
     if (resourceId != m_currentResourceId) {
       m_currentResourceId = resourceId;
       ResourceManager::instance()->setLastUsedResourceId(resourceId);
@@ -296,9 +206,8 @@ void MainWindow::onTabChanged(int index) {
 void MainWindow::switchToResource(int index) {
   if (index >= 0 && index < m_tabBar->count()) {
     if (m_tabBar->currentIndex() == index) {
-      // If already on this index (e.g. startup auto-select while signals
-      // blocked), manually trigger the change logic
-      qDebug() << "Already on tab" << index << "- forcing onTabChanged";
+      // Already on this index (e.g. startup auto-select while signals
+      // blocked): trigger the change logic manually.
       onTabChanged(index);
     } else {
       m_tabBar->setCurrentIndex(index);
@@ -314,67 +223,109 @@ void MainWindow::switchToResourceById(const QString &id) {
 }
 
 void MainWindow::loadCurrentResource() {
-  qDebug() << "MainWindow::loadCurrentResource() - ENTRY";
   if (m_currentResourceId.isEmpty()) {
-    qWarning() << "m_currentResourceId is empty, cannot load resource";
     return;
   }
 
-  // Check if view already exists
   if (m_resourceViews.contains(m_currentResourceId)) {
-    qDebug() << "Switching to existing view for ID:" << m_currentResourceId;
     WebViewContainer *view = m_resourceViews[m_currentResourceId];
     m_stackedWidget->setCurrentWidget(view);
     m_webView = view;
 
-    // Ensure event filter is installed on focusProxy (may not exist at creation
-    // time)
+    // Ensure event filter is installed on focusProxy (may not exist at
+    // creation time)
     if (view->focusProxy()) {
       view->focusProxy()->installEventFilter(this);
     }
-  } else {
-    // Create new view
-    qDebug() << "Creating new view for ID:" << m_currentResourceId;
-    WebResource resource =
-        ResourceManager::instance()->getResourceById(m_currentResourceId);
-
-    if (resource.isValid()) {
-      WebViewContainer *view = new WebViewContainer(this);
-
-      // Install event filter on both the view and its focus proxy
-      // The focus proxy is the actual widget that receives keyboard events
-      view->installEventFilter(this);
-      if (view->focusProxy()) {
-        view->focusProxy()->installEventFilter(this);
-      }
-
-      // Connect zoom signal
-      connect(view, &WebViewContainer::zoomChanged, this,
-              &MainWindow::onZoomChanged);
-
-      // Apply current theme immediately
-      bool darkTheme = AppConfig::instance()->getDarkTheme();
-      view->applyWebViewTheme(darkTheme);
-
-      view->loadResource(resource);
-
-      m_stackedWidget->addWidget(view);
-      m_stackedWidget->setCurrentWidget(view);
-      m_resourceViews.insert(m_currentResourceId, view);
-      m_webView = view;
-    } else {
-      qWarning() << "Resource invalid, cannot create view";
-    }
+    return;
   }
 
-  qDebug() << "MainWindow::loadCurrentResource() - EXIT";
+  // Create new view
+  WebResource resource =
+      ResourceManager::instance()->getResourceById(m_currentResourceId);
+  if (!resource.isValid()) {
+    qWarning() << "Resource invalid, cannot create view:" << m_currentResourceId;
+    return;
+  }
+
+  WebViewContainer *view = new WebViewContainer(this);
+
+  // Install event filter on both the view and its focus proxy.
+  // The focus proxy is the actual widget that receives keyboard events.
+  view->installEventFilter(this);
+  if (view->focusProxy()) {
+    view->focusProxy()->installEventFilter(this);
+  }
+
+  connect(view, &WebViewContainer::zoomChanged, this,
+          &MainWindow::onZoomChanged);
+
+  view->applyWebViewTheme(AppConfig::instance()->getDarkTheme());
+  view->loadResource(resource);
+
+  m_stackedWidget->addWidget(view);
+  m_stackedWidget->setCurrentWidget(view);
+  m_resourceViews.insert(m_currentResourceId, view);
+  m_webView = view;
 }
 
-// ... Existing implementations for other methods ...
-// I will copy them back to ensure file completeness, avoiding "empty
-// implementation" errors For brevity in this tool call, I'm providing the
-// rewritten structure. I will need to be careful not to delete existing logic I
-// want to keep.
+void MainWindow::onResourceRemoved(const QString &resourceId) {
+  WebViewContainer *view = m_resourceViews.take(resourceId);
+  if (!view)
+    return;
+
+  m_stackedWidget->removeWidget(view);
+  if (m_webView == view) {
+    m_webView = nullptr;
+  }
+  if (m_currentResourceId == resourceId) {
+    m_currentResourceId.clear();
+  }
+  // Frees the underlying Chromium renderer instead of leaking it until exit.
+  view->deleteLater();
+}
+
+void MainWindow::onResourceUpdated(const QString &resourceId) {
+  WebViewContainer *view = m_resourceViews.value(resourceId);
+  if (!view)
+    return;
+
+  WebResource resource =
+      ResourceManager::instance()->getResourceById(resourceId);
+  if (resource.isValid() && view->resourceUrl() != QUrl(resource.url)) {
+    view->loadResource(resource); // URL changed: reload the tab now
+  }
+}
+
+void MainWindow::reloadCurrentResource() {
+  if (m_currentResourceId.isEmpty())
+    return;
+  if (m_resourceViews.contains(m_currentResourceId)) {
+    m_resourceViews[m_currentResourceId]->reloadPage();
+  } else {
+    loadCurrentResource();
+  }
+}
+
+void MainWindow::onTabContextMenuRequested(const QPoint &pos) {
+  int index = m_tabBar->tabAt(pos);
+  if (index == -1)
+    return;
+
+  QMenu menu(this);
+  QAction *refreshAction = menu.addAction("Refresh");
+  connect(refreshAction, &QAction::triggered, this, [this, index]() {
+    if (index >= 0 && index < m_tabResourceIds.size()) {
+      const QString id = m_tabResourceIds[index];
+      if (m_resourceViews.contains(id)) {
+        m_resourceViews[id]->reloadPage();
+      } else if (id == m_currentResourceId) {
+        loadCurrentResource();
+      }
+    }
+  });
+  menu.exec(m_tabBar->mapToGlobal(pos));
+}
 
 void MainWindow::showAndActivate() {
   if (isMinimized()) {
@@ -431,24 +382,20 @@ void MainWindow::insertClipboardText(bool useAltScript) {
   }
 }
 
-void MainWindow::setOnlineStatus(bool online) {
-  if (!m_webView) return;
-  if (online) {
-    m_webView->reloadPage();
-  } else {
-    m_webView->setHtml("<html><body><h2>Offline</h2></body></html>");
-  }
-}
-
 void MainWindow::toggleAlwaysOnTop() {
+  const bool wasVisible = isVisible();
   Qt::WindowFlags flags = windowFlags();
   if (flags & Qt::WindowStaysOnTopHint) {
     flags &= ~Qt::WindowStaysOnTopHint;
   } else {
     flags |= Qt::WindowStaysOnTopHint;
   }
+  // setWindowFlags() hides the window; only re-show if it was visible so
+  // toggling from the tray does not pop up a hidden window.
   setWindowFlags(flags);
-  show();
+  if (wasVisible) {
+    show();
+  }
 }
 
 void MainWindow::applyWebViewTheme(bool darkTheme) {
@@ -459,7 +406,6 @@ void MainWindow::applyWebViewTheme(bool darkTheme) {
 
   // Apply theme to drag handle and header elements
   if (darkTheme) {
-    // Dark theme colors
     m_dragHandle->setStyleSheet("background-color: #2b2b2b;");
     m_settingsButton->setStyleSheet(
         "QPushButton { background-color: transparent; color: #fff; border: "
@@ -486,7 +432,6 @@ void MainWindow::applyWebViewTheme(bool darkTheme) {
                             "   background: #333; color: #fff; "
                             "}");
   } else {
-    // Light theme colors
     m_dragHandle->setStyleSheet("background-color: #f0f0f0;");
     m_settingsButton->setStyleSheet(
         "QPushButton { background-color: transparent; color: #333; border: "
@@ -516,8 +461,9 @@ void MainWindow::applyWebViewTheme(bool darkTheme) {
 }
 
 void MainWindow::onSettingsRequested() {
-  // Create dialog WITHOUT parent to avoid modality issues with frameless window
-  // The parent relationship was causing nativeEvent to stop working on Windows
+  // Create dialog WITHOUT parent to avoid modality issues with frameless
+  // window. The parent relationship was causing nativeEvent to stop working
+  // on Windows.
   SettingsDialog dialog(nullptr);
   dialog.setWindowModality(Qt::ApplicationModal);
   dialog.setAttribute(Qt::WA_DeleteOnClose, false);
@@ -528,19 +474,16 @@ void MainWindow::onSettingsRequested() {
   // Store original opacity to revert if cancelled
   int originalOpacity = AppConfig::instance()->getWindowOpacity();
 
-  // Connect immediate update signal for "Apply" button or live changes
+  // Live opacity preview while the user drags the spinbox
   connect(&dialog, &SettingsDialog::testOpacity, this, &MainWindow::setOpacity);
 
   if (dialog.exec() == QDialog::Accepted) {
-    // Apply settings after dialog closes (already saved by dialog)
     applySettings();
   } else {
-    // Revert opacity if cancelled (and other visual settings if we live-updated
-    // them)
+    // Revert live-previewed opacity
     setOpacity(originalOpacity);
   }
 
-  // Ensure the main window is properly reactivated
   activateWindow();
   raise();
 }
@@ -555,55 +498,26 @@ void MainWindow::applySettings() {
     toggleAlwaysOnTop();
   }
 
-  // Apply theme changes
   applyWebViewTheme(config->getDarkTheme());
-
-  // Refresh resources in case they changed
-  refreshResources();
-}
-
-void MainWindow::applyStartupTheme() {
-  bool dark = AppConfig::instance()->getDarkTheme();
-  applyWebViewTheme(dark);
 }
 
 void MainWindow::setOpacity(int value) {
-  // Use Qt's method as baseline
   setWindowOpacity(value / 100.0);
 
 #ifdef Q_OS_WIN
-  // Direct Windows API approach: SetLayeredWindowAttributes
-  // This bypasses any Qt caching and directly tells Windows to update the
-  // alpha.
+  // Direct Windows API: SetLayeredWindowAttributes bypasses Qt caching and
+  // updates the alpha immediately (needed for live preview).
   HWND hwnd = (HWND)winId();
   if (hwnd) {
-    // Ensure WS_EX_LAYERED style is set (should be, for frameless translucent
-    // windows)
     LONG_PTR exStyle = GetWindowLongPtr(hwnd, GWL_EXSTYLE);
     if (!(exStyle & WS_EX_LAYERED)) {
       SetWindowLongPtr(hwnd, GWL_EXSTYLE, exStyle | WS_EX_LAYERED);
     }
-
-    // Set alpha directly: value is 0-100, Windows expects 0-255
     BYTE alpha = static_cast<BYTE>((value * 255) / 100);
     SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA);
   }
 #endif
 }
-
-void MainWindow::onClipboardChanged(const QString &text) {
-  if (AppConfig::instance()->getAutoTranslate() && !text.isEmpty()) {
-    showAndActivate();
-    if (m_webView)
-      m_webView->insertText(text);
-  }
-}
-
-void MainWindow::onCloseButtonClicked() { hide(); }
-
-void MainWindow::onMinimizeButtonClicked() { showMinimized(); }
-
-void MainWindow::onSettingsButtonClicked() { onSettingsRequested(); }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
   // Intercept key events from WebView to handle Alt+Number tab switching
@@ -612,8 +526,7 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
     if (keyEvent->modifiers() & Qt::AltModifier) {
       int key = keyEvent->key();
       if (key >= Qt::Key_1 && key <= Qt::Key_9) {
-        int index = key - Qt::Key_1;
-        switchToResource(index);
+        switchToResource(key - Qt::Key_1);
         return true; // Event handled, don't propagate to WebView
       }
     }
@@ -626,8 +539,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
   if (event->modifiers() & Qt::AltModifier) {
     int key = event->key();
     if (key >= Qt::Key_1 && key <= Qt::Key_9) {
-      int index = key - Qt::Key_1;
-      switchToResource(index);
+      switchToResource(key - Qt::Key_1);
       event->accept();
       return;
     }
@@ -635,40 +547,30 @@ void MainWindow::keyPressEvent(QKeyEvent *event) {
   QMainWindow::keyPressEvent(event);
 }
 
-void MainWindow::mousePressEvent(QMouseEvent *event) {
-  QMainWindow::mousePressEvent(event);
-}
-
-void MainWindow::mouseMoveEvent(QMouseEvent *event) {
-  QMainWindow::mouseMoveEvent(event);
-}
-
-void MainWindow::mouseReleaseEvent(QMouseEvent *event) {
-  QMainWindow::mouseReleaseEvent(event);
-}
-
 void MainWindow::closeEvent(QCloseEvent *event) {
-  hide();
-  event->ignore();
+  if (AppConfig::instance()->getMinimizeToTray()) {
+    hide();
+    event->ignore();
+  } else {
+    saveGeometryToConfig();
+    event->accept();
+    QApplication::quit();
+  }
 }
 
 void MainWindow::changeEvent(QEvent *event) {
   QMainWindow::changeEvent(event);
   if (event->type() == QEvent::WindowStateChange) {
-    if (isMinimized())
+    if (isMinimized() && AppConfig::instance()->getMinimizeToTray()) {
       hide();
+    }
   }
 }
 
 void MainWindow::hideEvent(QHideEvent *event) {
   // Save window geometry when hiding
   if (!isMinimized() && !isMaximized()) {
-    AppConfig *config = AppConfig::instance();
-    config->setWindowWidth(width());
-    config->setWindowHeight(height());
-    config->setWindowX(x());
-    config->setWindowY(y());
-    config->save();
+    saveGeometryToConfig();
   }
   QMainWindow::hideEvent(event);
 }
@@ -747,23 +649,12 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
 #endif
 
 void MainWindow::onZoomChanged(const QString &resourceId, double zoomFactor) {
-  qDebug() << "MainWindow::onZoomChanged -" << resourceId << zoomFactor;
+  // Silent in-memory update: no resourcesChanged signal, so per-tick zoom
+  // does not rebuild the tab bar.
+  ResourceManager::instance()->setResourceZoom(resourceId, zoomFactor);
 
-  // Update in-memory state immediately
-  WebResource resource =
-      ResourceManager::instance()->getResourceById(resourceId);
-  if (resource.isValid()) {
-    resource.zoomFactor = zoomFactor;
-    ResourceManager::instance()->updateResource(resource);
-  }
-
-  // Debounce: restart timer on every scroll tick; only persist after 500ms idle
-  // This prevents blocking disk I/O on every Ctrl+wheel event.
+  // Debounce: restart timer on every scroll tick; persist after 500ms idle
   if (m_zoomSaveTimer) {
-    m_zoomSaveTimer->disconnect();
-    connect(m_zoomSaveTimer, &QTimer::timeout, this, []() {
-      ResourceManager::instance()->saveToConfig();
-    });
     m_zoomSaveTimer->start();
   }
 }

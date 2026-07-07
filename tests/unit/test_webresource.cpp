@@ -13,6 +13,9 @@ private slots:
     void testRejectsNoScheme();
     void testRejectsEmptyId();
     void testRejectsEmptyName();
+    void testRejectsHostlessUrl();
+    void testRejectsUppercaseNonHttpSchemes();
+    void testFromJsonMissingFieldsUseDefaults();
     void testJsonRoundTrip();
     void testFromJsonGeneratesIdWhenMissing();
     void testCreateFactory();
@@ -62,6 +65,34 @@ void TestWebResource::testRejectsEmptyName() {
     r.id  = "some-uuid";
     r.url = "https://example.com";
     QVERIFY(!r.isValid());
+}
+
+void TestWebResource::testRejectsHostlessUrl() {
+    // "https://" is a syntactically fine scheme but has no host — a tab
+    // created from it can never load.
+    QVERIFY(!WebResource::create("Test", "https://").isValid());
+    QVERIFY(!WebResource::create("Test", "http://").isValid());
+    QVERIFY(WebResource::create("Test", "https://example.com").isValid());
+}
+
+void TestWebResource::testRejectsUppercaseNonHttpSchemes() {
+    QVERIFY(!WebResource::create("Test", "JAVASCRIPT:alert(1)").isValid());
+    QVERIFY(!WebResource::create("Test", "FILE:///C:/Windows").isValid());
+    // Uppercase HTTP(S) is still fine
+    QVERIFY(WebResource::create("Test", "HTTPS://example.com").isValid());
+}
+
+void TestWebResource::testFromJsonMissingFieldsUseDefaults() {
+    QJsonObject json;
+    json["name"] = "Minimal";
+    json["url"]  = "https://example.com";
+
+    WebResource r = WebResource::fromJson(json);
+    QVERIFY(r.isEnabled);            // defaults to enabled
+    QCOMPARE(r.order, 0);
+    QCOMPARE(r.zoomFactor, 1.0);
+    QVERIFY(r.initScript.isEmpty());
+    QVERIFY(r.isValid());
 }
 
 void TestWebResource::testJsonRoundTrip() {

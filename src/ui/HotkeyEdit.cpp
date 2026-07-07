@@ -137,6 +137,13 @@ bool HotkeyEdit::eventFilter(QObject *watched, QEvent *event) {
       // Remove numpad modifier if present
       mods &= ~Qt::KeypadModifier;
 
+      // Require Ctrl/Alt/Win: a bare (or Shift-only) global hotkey would
+      // intercept normal typing in every application system-wide.
+      if (!(mods & (Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier))) {
+        m_lineEdit->setText("Add Ctrl, Alt or Win...");
+        return true; // keep recording
+      }
+
       // Save the new hotkey
       m_key = key;
       m_modifiers = mods;
