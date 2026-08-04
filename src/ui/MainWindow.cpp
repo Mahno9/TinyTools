@@ -681,10 +681,10 @@ bool MainWindow::nativeEvent(const QByteArray &eventType, void *message,
     if (isMaximized())
       return false;
 
-    // Use lParam screen coordinates — more accurate than QCursor::pos() under
-    // fast movement and multi-monitor DPI scaling.
-    QPoint localPos = mapFromGlobal(
-        QPoint(GET_X_LPARAM(msg->lParam), GET_Y_LPARAM(msg->lParam)));
+    // QCursor::pos() is in Qt logical coordinates, which is what mapFromGlobal
+    // expects. lParam carries physical pixels and breaks the hit-test on any
+    // display scaled above 100%.
+    QPoint localPos = mapFromGlobal(QCursor::pos());
 
     int w = width();
     int h = height();
