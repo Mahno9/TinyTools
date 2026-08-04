@@ -30,7 +30,9 @@ jobs:
         shell: cmd
         run: |
           if not exist C:\Qt mkdir C:\Qt
-          python -m aqt install-qt windows desktop 6.3.0 win64_msvc2019_64 --outputdir C:\Qt --modules qtwebengine qtwebchannel qtpositioning
+          rem -E 7z: extract with the runner's 7-Zip. py7zr's path sanitizer
+          rem rejects some Qt archive entries and aborts the install.
+          python -m aqt install-qt windows desktop 6.3.0 win64_msvc2019_64 --outputdir C:\Qt --modules qtwebengine qtwebchannel qtpositioning -E 7z
 
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
