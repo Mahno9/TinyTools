@@ -24,7 +24,10 @@ jobs:
           python-version: "3.x"
 
       - name: Install aqtinstall
-        run: pip install aqtinstall
+        # Pinned past PyPI's 3.3.0: that release corrupts external-7z error
+        # output (bytes/str TypeError), turning benign warnings into a hard
+        # crash. Fixed upstream in d8759ecd8b, never released to PyPI.
+        run: pip install "git+https://github.com/miurahr/aqtinstall.git@d8759ecd8b"
 
       - name: Install Qt
         shell: cmd
