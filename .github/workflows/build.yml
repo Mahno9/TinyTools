@@ -32,7 +32,10 @@ jobs:
       - name: Install Qt
         shell: cmd
         run: |
-          if not exist C:\Qt mkdir C:\Qt
+          rem Pre-create the exact target dir: parallel 7z workers race to
+          rem create it themselves and 7z.exe treats ERROR_ALREADY_EXISTS as
+          rem fatal, so the first one to lose that race aborts the install.
+          if not exist C:\Qt\6.10.3\msvc2022_64 mkdir C:\Qt\6.10.3\msvc2022_64
           rem -E 7z: extract with the runner's 7-Zip. py7zr's path sanitizer
           rem rejects some Qt archive entries and aborts the install.
           python -m aqt install-qt windows desktop 6.10.3 win64_msvc2022_64 --outputdir C:\Qt --modules qtwebengine qtwebchannel qtpositioning -E 7z
