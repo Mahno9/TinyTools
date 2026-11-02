@@ -7,10 +7,9 @@
 #include <QMutex>
 #include <Qt>
 
-// Forward declaration of HotkeyType namespace
-namespace HotkeyType {
-    enum Type;
-}
+// HotkeyType::Type is an unscoped enum, so it cannot be forward-declared
+// without a fixed underlying type; include the definition instead.
+#include "../core/HotkeyManager.h"
 
 class AppConfig : public QObject {
     Q_OBJECT

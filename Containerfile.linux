@@ -1,0 +1,29 @@
+# Linux build environment for TinyTools (Qt 6 + WebEngine).
+#
+# Build the image:
+#   podman build -f Containerfile.linux -t tinytools-builder .
+#
+# Build and test the application:
+#   podman run --rm -v "$PWD":/src:Z -w /src tinytools-builder \
+#       bash -c 'cmake -S . -B build-linux -G Ninja -DCMAKE_BUILD_TYPE=Release &&
+#                cmake --build build-linux &&
+#                ctest --test-dir build-linux --output-on-failure'
+
+FROM ubuntu:26.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        cmake \
+        ninja-build \
+        pkg-config \
+        qt6-base-dev \
+        qt6-base-dev-tools \
+        qt6-webengine-dev \
+        qt6-webengine-dev-tools \
+        libqt6webenginecore6-bin \
+        libqt6test6 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src

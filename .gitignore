@@ -83,3 +83,6 @@ task.md
 
 build_msvc
 tinytools_log.txt
+
+# Linux bundle output
+dist/
