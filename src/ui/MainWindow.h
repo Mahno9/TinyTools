@@ -59,6 +59,11 @@ private:
   void loadCurrentResource();
   void saveGeometryToConfig();
 
+  // Frameless window move/resize support (non-Windows platforms).
+  Qt::Edges edgesAt(const QPoint &pos) const;
+  bool isDragArea(QWidget *widget) const;
+  void updateEdgeCursor(Qt::Edges edges);
+
   QPointer<ClipboardManager> m_clipboardManager;
 
   QWidget *m_dragHandle = nullptr;
@@ -76,6 +81,9 @@ private:
 
   QAction *m_refreshAction = nullptr;
   QTimer *m_zoomSaveTimer = nullptr;
+
+  // True while a resize cursor is installed as an application override.
+  bool m_edgeCursorActive = false;
 
   static constexpr int RESIZE_MARGIN = 10;
 };

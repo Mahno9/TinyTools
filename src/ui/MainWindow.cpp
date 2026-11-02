@@ -6,19 +6,23 @@
 #include "SettingsDialog.h"
 #include "WebViewContainer.h"
 #include <QAction>
+#include <QAbstractButton>
 #include <QApplication>
 #include <QCloseEvent>
+#include <QCursor>
 #include <QDebug>
 #include <QGuiApplication>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QMenu>
+#include <QMouseEvent>
 #include <QPushButton>
 #include <QScreen>
 #include <QStackedWidget>
 #include <QTabBar>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QWindow>
 
 #ifdef Q_OS_WIN
 #include <windows.h>
@@ -32,6 +36,11 @@ MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
   setupUI();
   setupWindowFlags(config->getAlwaysOnTop());
   setupWebView();
+
+  // Frameless windows have no title bar to drag or native borders to resize,
+  // so the window itself must handle both (see eventFilter).
+  qApp->installEventFilter(this);
+  setMinimumSize(400, 300);
 
   resize(config->getWindowWidth(), config->getWindowHeight());
   move(config->getWindowX(), config->getWindowY());
@@ -61,7 +70,10 @@ MainWindow::MainWindow(ClipboardManager *clipboardManager, QWidget *parent)
   }
 }
 
-MainWindow::~MainWindow() { saveGeometryToConfig(); }
+MainWindow::~MainWindow() {
+  updateEdgeCursor(Qt::Edges());
+  saveGeometryToConfig();
+}
 
 void MainWindow::saveGeometryToConfig() {
   AppConfig *config = AppConfig::instance();
@@ -82,6 +94,8 @@ void MainWindow::setupUI() {
   // Custom Title Bar (Drag Handle)
   m_dragHandle = new QWidget(this);
   m_dragHandle->setFixedHeight(30);
+  // Needed for edge-resize cursor feedback without a button held down.
+  m_dragHandle->setMouseTracking(true);
 
   QHBoxLayout *dragHandleLayout = new QHBoxLayout(m_dragHandle);
   dragHandleLayout->setContentsMargins(0, 0, 5, 0);
@@ -97,6 +111,7 @@ void MainWindow::setupUI() {
   // Tab Bar for Resources
   m_tabBar = new QTabBar(m_dragHandle);
   m_tabBar->setDrawBase(false);
+  m_tabBar->setMouseTracking(true);
   connect(m_tabBar, &QTabBar::currentChanged, this, &MainWindow::onTabChanged);
 
   // Enable context menu for tabs
@@ -520,8 +535,45 @@ void MainWindow::setOpacity(int value) {
 }
 
 bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
+  QWidget *widget = qobject_cast<QWidget *>(watched);
+  const bool ownWidget = widget && widget->window() == this;
+
+#ifndef Q_OS_WIN
+  // Frameless window: the OS provides neither a drag handle nor resize
+  // borders, so implement them with the compositor's system move/resize
+  // (works on Wayland and X11, including HiDPI and multi-monitor).
+  if (ownWidget && event->type() == QEvent::MouseMove) {
+    auto *mouseEvent = static_cast<QMouseEvent *>(event);
+    updateEdgeCursor(
+        edgesAt(mapFromGlobal(mouseEvent->globalPosition().toPoint())));
+  } else if (ownWidget && event->type() == QEvent::MouseButtonPress) {
+    auto *mouseEvent = static_cast<QMouseEvent *>(event);
+    if (mouseEvent->button() == Qt::LeftButton) {
+      const QPoint pos =
+          mapFromGlobal(mouseEvent->globalPosition().toPoint());
+      const Qt::Edges edges = edgesAt(pos);
+      if (edges) {
+        updateEdgeCursor(edges);
+        if (QWindow *handle = windowHandle()) {
+          handle->startSystemResize(edges);
+          return true;
+        }
+      } else if (isDragArea(widget)) {
+        if (QWindow *handle = windowHandle()) {
+          handle->startSystemMove();
+          return true;
+        }
+      }
+    }
+  } else if (widget == this &&
+             (event->type() == QEvent::Leave ||
+              event->type() == QEvent::Hide)) {
+    updateEdgeCursor(Qt::Edges());
+  }
+#endif
+
   // Intercept key events from WebView to handle Alt+Number tab switching
-  if (event->type() == QEvent::KeyPress) {
+  if (event->type() == QEvent::KeyPress && ownWidget) {
     QKeyEvent *keyEvent = static_cast<QKeyEvent *>(event);
     if (keyEvent->modifiers() & Qt::AltModifier) {
       int key = keyEvent->key();
@@ -532,6 +584,66 @@ bool MainWindow::eventFilter(QObject *watched, QEvent *event) {
     }
   }
   return QMainWindow::eventFilter(watched, event);
+}
+
+Qt::Edges MainWindow::edgesAt(const QPoint &pos) const {
+  Qt::Edges edges;
+  if (pos.x() <= RESIZE_MARGIN)
+    edges |= Qt::LeftEdge;
+  if (pos.x() >= width() - RESIZE_MARGIN)
+    edges |= Qt::RightEdge;
+  if (pos.y() <= RESIZE_MARGIN)
+    edges |= Qt::TopEdge;
+  if (pos.y() >= height() - RESIZE_MARGIN)
+    edges |= Qt::BottomEdge;
+  return edges;
+}
+
+bool MainWindow::isDragArea(QWidget *widget) const {
+  if (!m_dragHandle || !widget)
+    return false;
+  if (widget != m_dragHandle && !m_dragHandle->isAncestorOf(widget))
+    return false;
+  // Interactive controls in the title bar must keep their normal behavior.
+  for (QWidget *w = widget; w && w != m_dragHandle->parentWidget();
+       w = w->parentWidget()) {
+    if (qobject_cast<QAbstractButton *>(w) || qobject_cast<QTabBar *>(w))
+      return false;
+  }
+  return true;
+}
+
+void MainWindow::updateEdgeCursor(Qt::Edges edges) {
+  if (!edges) {
+    if (m_edgeCursorActive) {
+      QGuiApplication::restoreOverrideCursor();
+      m_edgeCursorActive = false;
+    }
+    return;
+  }
+
+  const bool left = edges & Qt::LeftEdge;
+  const bool right = edges & Qt::RightEdge;
+  const bool top = edges & Qt::TopEdge;
+  const bool bottom = edges & Qt::BottomEdge;
+
+  Qt::CursorShape shape = Qt::ArrowCursor;
+  if ((top && left) || (bottom && right))
+    shape = Qt::SizeFDiagCursor;
+  else if ((top && right) || (bottom && left))
+    shape = Qt::SizeBDiagCursor;
+  else if (left || right)
+    shape = Qt::SizeHorCursor;
+  else if (top || bottom)
+    shape = Qt::SizeVerCursor;
+
+  if (!m_edgeCursorActive) {
+    QGuiApplication::setOverrideCursor(QCursor(shape));
+    m_edgeCursorActive = true;
+  } else if (QGuiApplication::overrideCursor() &&
+             QGuiApplication::overrideCursor()->shape() != shape) {
+    QGuiApplication::changeOverrideCursor(QCursor(shape));
+  }
 }
 
 void MainWindow::keyPressEvent(QKeyEvent *event) {
@@ -572,6 +684,7 @@ void MainWindow::hideEvent(QHideEvent *event) {
   if (!isMinimized() && !isMaximized()) {
     saveGeometryToConfig();
   }
+  updateEdgeCursor(Qt::Edges());
   QMainWindow::hideEvent(event);
 }
 
